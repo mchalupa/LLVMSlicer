@@ -199,6 +199,135 @@ void CallMaps::buildCallMaps(const Module &M) {
 
 }}}
 
+namespace llvm {
+namespace ptr {
+
+PointsToGraph::~PointsToGraph()
+{
+    std::set<Node *>::iterator I, E;
+
+    for (I = Nodes.begin(), E = Nodes.end(); I != E; ++I)
+        delete *I;
+
+    // PointsToGraph adopts the category, since it must be
+    // allocated on heap because of virtual functions
+    delete PTC;
+}
+
+PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
+{
+    std::set<Node *>::const_iterator I, E;
+
+    for (I = Nodes.cbegin(), E = Nodes.cend(); I != E; ++I)
+        if ((*I)->contains(p))
+            return *I;
+
+    return NULL;
+}
+
+// take nodes outgoing from root and check if pointee p
+// should be added into one of them
+PointsToGraph::Node *
+PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
+{
+    std::set<Node *>::const_iterator I, E;
+    I = root->getEdges().cbegin();
+    E = root->getEdges().cend();
+
+    for (; I != E; ++I)
+        // since node can contain only elements from the same category
+        // it's sufficent to check only one element from each node
+        if (PTC->areInSameCategory(*((*I)->getElements().cbegin()), p))
+            return *I;
+
+    return NULL;
+}
+
+bool PointsToGraph::insert(Pointer p, Pointee location)
+{
+    bool changed = false;
+
+#define PTG_DEBUG
+
+#ifdef PTG_DEBUG
+    errs() << " -- PTG_DEBUG insert start --\n";
+
+    errs() << "ptr: "; p.first->dump();
+    errs() << "ptee: "; location.first->dump();
+    errs() << "\n";
+#endif
+
+    // find node that contains pointer p. From this node will
+    // be created new outgoing edge (if needed)
+    PointsToGraph::Node *From = NULL, *To = NULL;
+    From = findNode(p);
+
+    // if pointer p appears first time
+    if (!From) {
+        From = new Node(p);
+        Nodes.insert(From);
+#ifdef PTG_DEBUG
+            errs() << "Creating new node for ";
+            p.first->dump();
+#endif
+    }
+
+    To = shouldAddTo(From, location);
+
+    if (To) {
+        ///
+        // insert location into existing node if it's appropriated
+        ///
+#ifdef PTG_DEBUG
+        errs() << "ADD"; location.first->dump();
+        errs() << "to node where is ";
+        (To->getElements().cbegin())->first->dump();
+#endif
+
+        changed = To->insert(location);
+    } else if ((To = findNode(location))) {
+        ///
+        // if the location is already in some node, use this node
+        ///
+#ifdef PTG_DEBUG
+        errs() << "ADD EDGE to node where is";
+        (To->getElements().cbegin())->first->dump();
+#endif
+
+        From->addNeighbour(To);
+    } else {
+        ///
+        // the node doesn't exists, create new one
+        ///
+
+#ifdef PTG_DEBUG
+        errs() << "ADD EDGE from node where is ";
+        (From->getElements().cbegin())->first->dump();
+        errs() << "to node "; location.first->dump();
+#endif
+
+        To = new Node(location);
+        Nodes.insert(To);
+
+        From->addNeighbour(To);
+
+        changed = true;
+    }
+#ifdef PTG_DEBUG
+    errs() << " -- PTG_DEBUG insert end --\n";
+#endif
+
+    return changed;
+}
+
+void PointsToGraph::buildGraph(void)
+{
+}
+
+
+} // namespace ptr
+} // namespace llvm
+
 namespace llvm { namespace ptr {
 
 typedef PointsToSets::PointsToSet PTSet;

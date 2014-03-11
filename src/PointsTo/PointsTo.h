@@ -92,29 +92,48 @@ namespace llvm { namespace ptr {
 namespace llvm {
 namespace ptr {
 
-    // not sure here yet
     class PointsToCategories
     {
     public:
         typedef PointsToSets::Pointer Pointer;
 
+        PointsToCategories() {}
+        virtual ~PointsToCategories() {}
         PointsToCategories(int K)
         :K(K) {}
 
         int getK(void) const { return K; }
-        bool areInSameCategory(Pointer a, Pointer b) const;
+        virtual bool areInSameCategory(Pointer a, Pointer b) const = 0;
 
     private:
-        // use -1 for undefined, that is all pointers are in the same
-        // category
         int K;
+    };
+
+    // implies Stengaard's analysis
+    class AllInOneCategory : public PointsToCategories
+    {
+    public:
+        virtual bool areInSameCategory(Pointer a, Pointer b) const
+        {
+            return true;
+        }
+    };
+
+    // implies Andersen's analysis
+    class AllInSelfCategory : public PointsToCategories
+    {
+    public:
+        virtual bool areInSameCategory(Pointer a, Pointer b) const
+        {
+            return false;
+        }
     };
 
     class PointsToGraph
     {
     public:
         // will build the points-to graph right from the constructor
-        PointsToGraph(const ProgramStructure &PS, const PointsToCategories &PTC)
+        PointsToGraph(ProgramStructure &PS, PointsToCategories *PTC)
         :PS(PS), PTC(PTC)
         {
             buildGraph();
@@ -126,6 +145,9 @@ namespace ptr {
         typedef PointsToSets::Pointee Pointee;
 
         PointsToSets& toPointsToSets(void) const;
+
+        // insert that p points to location
+        bool insert(Pointer p, Pointee location);
 
     private:
         // this class represents one node in the graph
@@ -166,20 +188,21 @@ namespace ptr {
         };
 
         void buildGraph();
-        const PointsToCategories& getCategories(void) const
+        const PointsToCategories *getCategories(void) const
         {
             return PTC;
         }
 
-        // find node which contains pointer/pointee p
-        Node *findNode(Pointer p) const;
+        // return Node that the pointee should be merged to
+        // or NULL
+        Node *shouldAddTo(Node *root, Pointee p);
 
-        // insert what points to where
-        bool insert(Pointer what, Pointer where);
+        // find node which contains pointer/pointee p
+        Node *findNode(Pointee p) const;
 
         std::set<Node *> Nodes;
         ProgramStructure PS;
-        PointsToCategories PTC;
+        PointsToCategories *PTC;
     };
 
 } // namespace ptr
