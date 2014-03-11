@@ -89,6 +89,102 @@ namespace llvm { namespace ptr {
 
 }}
 
+namespace llvm {
+namespace ptr {
+
+    // not sure here yet
+    class PointsToCategories
+    {
+    public:
+        typedef PointsToSets::Pointer Pointer;
+
+        PointsToCategories(int K)
+        :K(K) {}
+
+        int getK(void) const { return K; }
+        bool areInSameCategory(Pointer a, Pointer b) const;
+
+    private:
+        // use -1 for undefined, that is all pointers are in the same
+        // category
+        int K;
+    };
+
+    class PointsToGraph
+    {
+    public:
+        // will build the points-to graph right from the constructor
+        PointsToGraph(const ProgramStructure &PS, const PointsToCategories &PTC)
+        :PS(PS), PTC(PTC)
+        {
+            buildGraph();
+        }
+
+        virtual ~PointsToGraph();
+
+        typedef PointsToSets::Pointer Pointer;
+        typedef PointsToSets::Pointee Pointee;
+
+        PointsToSets& toPointsToSets(void) const;
+
+    private:
+        // this class represents one node in the graph
+        class Node
+        {
+        public:
+            Node() {};
+            Node(Pointee p) { insert(p); }
+
+            bool contains(Pointee p) const
+            {
+                return Elements.find(p) != Elements.end();
+            }
+
+            bool insert(Pointee p)
+            {
+                return Elements.insert(p).second;
+            }
+
+            const std::set<Pointee>& getElements(void) const
+            {
+                return Elements;
+            }
+
+            const std::set<Node *>& getEdges(void) const
+            {
+                return Edges;
+            }
+
+            bool addNeighbour(Node *n)
+            {
+                return Edges.insert(n).second;
+            }
+
+        private:
+            std::set<Pointee> Elements; // items in node
+            std::set<Node *> Edges; // edges to another nodes
+        };
+
+        void buildGraph();
+        const PointsToCategories& getCategories(void) const
+        {
+            return PTC;
+        }
+
+        // find node which contains pointer/pointee p
+        Node *findNode(Pointer p) const;
+
+        // insert what points to where
+        bool insert(Pointer what, Pointer where);
+
+        std::set<Node *> Nodes;
+        ProgramStructure PS;
+        PointsToCategories PTC;
+    };
+
+} // namespace ptr
+} // namespace llvm
+
 namespace llvm { namespace ptr {
 
   const PointsToSets::PointsToSet &
