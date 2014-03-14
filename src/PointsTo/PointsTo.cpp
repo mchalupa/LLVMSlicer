@@ -214,6 +214,75 @@ PointsToGraph::~PointsToGraph()
     delete PTC;
 }
 
+static void printPtrName(const PointsToGraph::Pointee p)
+{
+    const llvm::LoadInst *LInst;
+    const llvm::Value *val = p.first;
+
+    if (isa<CastInst>(p.first)) {
+        errs() << "BT: ";
+        val = val->stripPointerCasts();
+    } else if ((LInst = dyn_cast<LoadInst>(val))) {
+        errs() << "LD: ";
+        val = LInst->getPointerOperand();
+    }
+
+	if (isa<GlobalValue>(val))
+		errs() << "@";
+    else
+		errs() << "%";
+
+
+
+    if (val->hasName())
+	    errs() << val->getName().data();
+    else
+        errs() << val->getValueID();
+
+    if (p.second >= 0)
+        errs() << " + " << p.second;
+}
+
+void PointsToGraph::Node::dump(void) const
+{
+    std::set<Pointee>::const_iterator Begin;
+    std::set<Pointee>::const_iterator I, E;
+
+    Begin = I = Elements.cbegin();
+
+    errs() << "[";
+
+    for (E = Elements.cend(); I != E; ++I) {
+        if (I != Begin)
+            errs() << ", ";
+
+        printPtrName(*I);
+    }
+
+    errs() << "]\n";
+}
+
+void PointsToGraph::dump(void) const
+{
+    std::set<PointsToGraph::Node *>::const_iterator I, E;
+    std::set<PointsToGraph::Node *>::const_iterator II, EE;
+
+    if (Nodes.empty()) {
+        errs() << "PointsToGraph is empty\n";
+        return;
+    }
+
+    for(I = Nodes.begin(), E = Nodes.end(); I != E; ++I) {
+        (*I)->dump();
+
+        for (II = (*I)->getEdges().begin(), EE = (*I)->getEdges().end();
+                II != EE; ++II) {
+            errs() << "    --> ";
+            (*II)->dump();
+        }
+    }
+}
+
 PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
 {
     std::set<Node *>::const_iterator I, E;

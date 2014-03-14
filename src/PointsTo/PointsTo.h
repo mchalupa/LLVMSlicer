@@ -149,6 +149,8 @@ namespace ptr {
         // insert that p points to location
         bool insert(Pointer p, Pointee location);
 
+        void dump(void) const;
+
     private:
         // this class represents one node in the graph
         class Node
@@ -181,6 +183,8 @@ namespace ptr {
             {
                 return Edges.insert(n).second;
             }
+
+            void dump(void) const;
 
         private:
             std::set<Pointee> Elements; // items in node
