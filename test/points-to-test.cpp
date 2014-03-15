@@ -69,7 +69,7 @@ static void addPointsTo(Module &M, ptr::PointsToGraph &PTG,
 static void buildPointsToGraph(Module &M, void (*seq)(Module&, ptr::PointsToGraph&))
 {
     ptr::PointsToCategories *categ = new ptr::AllInOneCategory();
-    ptr::PointsToGraph PTG(*PS, categ);
+    ptr::PointsToGraph PTG(PS, categ);
 
     seq(M, PTG);
 

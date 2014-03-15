@@ -133,7 +133,7 @@ namespace ptr {
     {
     public:
         // will build the points-to graph right from the constructor
-        PointsToGraph(ProgramStructure &PS, PointsToCategories *PTC)
+        PointsToGraph(ProgramStructure *PS, PointsToCategories *PTC)
         :PS(PS), PTC(PTC)
         {
             buildGraph();
@@ -212,7 +212,7 @@ namespace ptr {
         Node *findNode(Pointee p) const;
 
         std::set<Node *> Nodes;
-        ProgramStructure PS;
+        ProgramStructure *PS;
         PointsToCategories *PTC;
     };
 
