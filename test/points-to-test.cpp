@@ -13,6 +13,25 @@ typedef ptr::PointsToGraph::Pointee Pointee;
 
 static ptr::ProgramStructure *PS;
 
+static void dumpPointsToSets(ptr::PointsToGraph &PTG)
+{
+    ptr::PointsToSets::const_iterator I, E;
+    ptr::PointsToSets::PointsToSet::const_iterator II, EE;
+
+    ptr::PointsToSets PS;
+    PTG.toPointsToSets(PS);
+
+    for (I = PS.begin(), E = PS.end(); I != E; ++I) {
+        errs() << "PTR: ";
+        I->first.first->dump();
+
+        for (II = I->second.cbegin(), EE = I->second.cend(); II != EE; ++II) {
+            errs() << "    --> ";
+            II->first->dump();
+        }
+    }
+}
+
 static void addPointsTo(Module &M, ptr::PointsToGraph &PTG,
                         const char *a, const char *b)
 {
@@ -54,7 +73,11 @@ static void buildPointsToGraph(Module &M, void (*seq)(Module&, ptr::PointsToGrap
 
     seq(M, PTG);
 
+    errs() << "Points-to graph:\n\n";
     PTG.dump();
+    errs() << "\nAssocaited points-to set:\n\n";
+    dumpPointsToSets(PTG);
+    errs() << "\n";
 }
 
 void figure1(Module& M, ptr::PointsToGraph& PTG)
