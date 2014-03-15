@@ -426,6 +426,31 @@ bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
     return changed;
 }
 
+bool PointsToGraph::insertDerefPointer(Pointer p, Pointee location)
+{
+    PointsToGraph::Node *PointerNode, *LocationNode;
+    bool changed = false;
+
+    PointerNode = findNode(p);
+
+    if (!PointerNode)
+        return false;
+
+    if (!PointerNode->hasNeighbours())
+        return false;
+
+    if (!(LocationNode = findNode(location)))
+        LocationNode = addNode(location);
+
+    std::set<PointsToGraph::Node *>::iterator I, E;
+    std::set<PointsToGraph::Node *>& Edges = PointerNode->getEdges();
+
+    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+        changed |= (*I)->addNeighbour(LocationNode);
+
+    return changed;
+}
+
 // add elements from node to PTSet of a pointer
 static void addToPTSet(const std::set<PointsToGraph::Pointee>& S,
                         PointsToSets::PointsToSet& PS)

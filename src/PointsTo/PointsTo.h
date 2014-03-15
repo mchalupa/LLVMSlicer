@@ -152,7 +152,7 @@ namespace ptr {
         // insert all pairs a->b where b is every pointer
         // the Pointee can points to
         bool insertDerefPointee(Pointer p, Pointee location);
-
+        bool insertDerefPointer(Pointer p, Pointee location);
         void dump(void) const;
 
     private:
