@@ -109,7 +109,7 @@ namespace ptr {
         int K;
     };
 
-    // implies Stengaard's analysis
+    // implies Steengaard's analysis
     class AllInOneCategory : public PointsToCategories
     {
     public:

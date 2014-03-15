@@ -316,8 +316,6 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 {
     bool changed = false;
 
-#define PTG_DEBUG
-
 #ifdef PTG_DEBUG
     errs() << " -- PTG_DEBUG insert start --\n";
 
