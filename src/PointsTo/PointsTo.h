@@ -144,7 +144,7 @@ namespace ptr {
         typedef PointsToSets::Pointer Pointer;
         typedef PointsToSets::Pointee Pointee;
 
-        PointsToSets& toPointsToSets(void) const;
+        PointsToSets& toPointsToSets(PointsToSets& PS) const;
 
         // insert that p points to location
         bool insert(Pointer p, Pointee location);
@@ -183,6 +183,13 @@ namespace ptr {
             {
                 return Edges.insert(n).second;
             }
+
+            bool hasNeighbours(void) const
+            {
+                return !Edges.empty();
+            }
+
+            void convertToPointsToSets(PointsToSets& PS) const;
 
             void dump(void) const;
 

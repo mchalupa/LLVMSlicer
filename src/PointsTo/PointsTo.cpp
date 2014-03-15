@@ -387,6 +387,47 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
     return changed;
 }
 
+// add elements from node to PTSet of a pointer
+static void addToPTSet(const std::set<PointsToGraph::Pointee>& S,
+                        PointsToSets::PointsToSet& PS)
+{
+    std::set<PointsToGraph::Pointee>::const_iterator I, E;
+
+    for (I = S.cbegin(), E = S.cend(); I != E; ++I)
+        PS.insert(*I);
+}
+
+void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS) const
+{
+    typedef PointsToSets::PointsToSet PTSet;
+    typedef PointsToSets::Pointer Ptr;
+
+    std::set<Pointee>::const_iterator ElemI, ElemE;
+    std::set<Node *>::const_iterator EdgesI, EdgesE;
+
+    for (ElemI = Elements.cbegin(), ElemE = Elements.cend();
+            ElemI != ElemE; ++ElemI) {
+
+        PTSet& S = PS[*ElemI];
+
+        for (EdgesI = Edges.cbegin(), EdgesE = Edges.cend();
+                EdgesI != EdgesE; ++EdgesI) {
+            addToPTSet((*EdgesI)->getElements(), S);
+        }
+    }
+}
+
+PointsToSets& PointsToGraph::toPointsToSets(PointsToSets& PS) const
+{
+    std::set<Node *>::const_iterator I, E;
+
+    for (I = Nodes.cbegin(), E = Nodes.cend(); I != E; ++I)
+        if ((*I)->hasNeighbours())
+            (*I)->convertToPointsToSets(PS);
+
+    return PS;
+}
+
 void PointsToGraph::buildGraph(void)
 {
 }
