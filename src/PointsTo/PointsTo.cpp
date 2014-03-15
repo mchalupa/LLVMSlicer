@@ -387,6 +387,45 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
     return changed;
 }
 
+bool PointsToGraph::insert(Pointer p, std::set<Pointee>& locations)
+{
+    std::set<Pointee>::iterator I, E;
+    bool changed = false;
+
+    for (I = locations.begin(), E = locations.end(); I != E; ++I)
+        changed |= insert(p, *I);
+}
+
+bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
+{
+    PointsToGraph::Node *LocationNode, *PointerNode;
+    bool changed = false;
+
+    LocationNode = findNode(location);
+
+    if (!LocationNode) {
+        // if location do not have a node yet, then it do not have
+        // neighbours which should be inserted.
+        // Do NOT add p->location into graph, because this functions
+        // should add p->*location, which is something different.
+        return false;
+    }
+
+    if (!LocationNode->hasNeighbours())
+        return false;
+
+    if (!(PointerNode = findNode(p)))
+        PointerNode = addNode(p);
+
+    std::set<PointsToGraph::Node *>::iterator I, E;
+    std::set<PointsToGraph::Node *>& Edges = LocationNode->getEdges();
+
+    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+       changed |= PointerNode->addNeighbour(*I);
+
+    return changed;
+}
+
 // add elements from node to PTSet of a pointer
 static void addToPTSet(const std::set<PointsToGraph::Pointee>& S,
                         PointsToSets::PointsToSet& PS)

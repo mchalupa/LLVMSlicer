@@ -149,6 +149,10 @@ namespace ptr {
         // insert that p points to location
         bool insert(Pointer p, Pointee location);
 
+        // insert all pairs a->b where b is every pointer
+        // the Pointee can points to
+        bool insertDerefPointee(Pointer p, Pointee location);
+
         void dump(void) const;
 
     private:
@@ -169,15 +173,11 @@ namespace ptr {
                 return Elements.insert(p).second;
             }
 
-            const std::set<Pointee>& getElements(void) const
-            {
-                return Elements;
-            }
+            std::set<Pointee>& getElements(void) { return Elements; }
+            const std::set<Pointee>& getElements(void) const { return Elements; }
 
-            const std::set<Node *>& getEdges(void) const
-            {
-                return Edges;
-            }
+            std::set<Node *>& getEdges(void) { return Edges; }
+            const std::set<Node *>& getEdges(void) const { return Edges; }
 
             bool addNeighbour(Node *n)
             {
@@ -203,6 +203,9 @@ namespace ptr {
         {
             return PTC;
         }
+
+        // insert that p points to all Pointees from locations
+        bool insert(Pointer p, std::set<Pointee>& locations);
 
         // return Node that the pointee should be merged to
         // or NULL
