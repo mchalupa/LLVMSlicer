@@ -9,3 +9,4 @@ target_link_libraries(dump-points-to LLVMSlicer ${FST_LLVM_LIBS})
 target_link_libraries(points-to-test LLVMSlicer ${FST_LLVM_LIBS})
 
 add_test(Field-sensitive-test field-sensitive-test)
+add_test(Points-to-test points-to-test)
