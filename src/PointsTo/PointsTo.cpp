@@ -368,7 +368,7 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
         (To->getElements().cbegin())->first->dump();
 #endif
 
-        From->addNeighbour(To);
+        changed = From->addNeighbour(To);
     } else {
         ///
         // the node doesn't exists, create new one
@@ -381,10 +381,7 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 #endif
 
         To = addNode(location);
-
-        From->addNeighbour(To);
-
-        changed = true;
+        changed = From->addNeighbour(To);
     }
 #ifdef PTG_DEBUG
     errs() << " -- PTG_DEBUG insert end --\n";
@@ -400,6 +397,8 @@ bool PointsToGraph::insert(Pointer p, std::set<Pointee>& locations)
 
     for (I = locations.begin(), E = locations.end(); I != E; ++I)
         changed |= insert(p, *I);
+
+    return changed;
 }
 
 bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
