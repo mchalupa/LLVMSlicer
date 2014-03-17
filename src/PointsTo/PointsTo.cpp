@@ -312,6 +312,18 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
     return NULL;
 }
 
+PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
+{
+    PointsToGraph::Node *n = new PointsToGraph::Node(p);
+    Nodes.insert(n);
+
+#ifdef PTG_DEBUG
+    errs() << "CREATE new node for "; p.first->dump();
+#endif
+
+    return n;
+}
+
 bool PointsToGraph::insert(Pointer p, Pointee location)
 {
     bool changed = false;
@@ -331,12 +343,7 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 
     // if pointer p appears first time
     if (!From) {
-        From = new Node(p);
-        Nodes.insert(From);
-#ifdef PTG_DEBUG
-            errs() << "Creating new node for ";
-            p.first->dump();
-#endif
+        From = addNode(p);
     }
 
     To = shouldAddTo(From, location);
@@ -373,8 +380,7 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
         errs() << "to node "; location.first->dump();
 #endif
 
-        To = new Node(location);
-        Nodes.insert(To);
+        To = addNode(location);
 
         From->addNeighbour(To);
 

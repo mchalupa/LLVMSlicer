@@ -214,6 +214,8 @@ namespace ptr {
         // find node which contains pointer/pointee p
         Node *findNode(Pointee p) const;
 
+        Node *addNode(Pointee p);
+
         std::set<Node *> Nodes;
         const ProgramStructure *PS;
         PointsToCategories *PTC;
