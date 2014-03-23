@@ -12,9 +12,12 @@ using namespace llvm;
 typedef ptr::PointsToGraph::Pointer Pointer;
 typedef ptr::PointsToGraph::Pointee Pointee;
 
+static Module *M;
 static ptr::ProgramStructure *PS;
 static std::map<const char *, Pointer> valueMap;
-static int retval = 0;
+
+static int failed = 0;
+static int total = 0;
 
 static void dumpPointsToSets(ptr::PointsToSets& PS)
 {
@@ -32,42 +35,38 @@ static void dumpPointsToSets(ptr::PointsToSets& PS)
     }
 }
 
+// get or create value
+static Pointer getPointer(const char *name)
+{
+    std::map<const char *, Pointer>::iterator I = valueMap.find(name);
+
+    if (I == valueMap.end()) {
+        Value *va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
+                                         false,
+                                         GlobalValue::CommonLinkage, 0 , name);
+        Pointer p(va, -1);
+        valueMap.insert(std::make_pair(name, p));
+
+        return p;
+    }
+
+    return I->second;
+}
+
 enum deref {
     DEREF_NONE,
     DEREF_POINTEE,
     DEREF_POINTER
 };
 
-static void addPointsTo(Module &M, ptr::PointsToGraph &PTG,
+static void addPointsTo(ptr::PointsToGraph &PTG,
                         const char *a, const char *b,
                         enum deref derefFlag = DEREF_NONE)
 {
-    std::map<const char *, Pointer>::iterator ai, bi;
     Pointer pa, pb;
 
-    ai = valueMap.find(a);
-    bi = valueMap.find(b);
-
-    if (ai == valueMap.end()) {
-        Value *va = new GlobalVariable(M, IntegerType::get(M.getContext(), 32),
-                                         false,
-                                         GlobalValue::CommonLinkage, 0 , a);
-        pa = Pointer(va, -1);
-        // use default copy constructor
-        valueMap.insert(std::make_pair(a, pa));
-    } else {
-        pa = ai->second;
-    }
-
-    if (bi == valueMap.end()) {
-        Value *vb = new GlobalVariable(M, IntegerType::get(M.getContext(), 32),
-                                          false,
-                                          GlobalValue::CommonLinkage, 0 , b);
-        pb = Pointer(vb, -1);
-        valueMap.insert(std::make_pair(b, pb));
-    } else {
-        pb = bi->second;
-    }
+    pa = getPointer(a);
+    pb = getPointer(b);
 
     switch (derefFlag) {
     case DEREF_NONE:
@@ -84,9 +83,8 @@ static void addPointsTo(Module &M, ptr::PointsToGraph &PTG,
 static void addPointsTo(ptr::PointsToSets& PTSets,
                         const char *a, const char *b)
 {
-    // XXX this will create the item in map if it doesn't exists
-    Pointer p = valueMap[a];
-    Pointee l = valueMap[b];
+    Pointer p = getPointer(a);
+    Pointee l = getPointer(b);
 
     ptr::PointsToSets::PointsToSet& S = PTSets[p];
     S.insert(l);
@@ -122,14 +120,16 @@ static bool comparePointsToSets(ptr::PointsToSets& a, ptr::PointsToSets& b)
     return true;
 }
 
-static void check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
+static bool check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
 {
     ptr::PointsToSets PTGSet;
 
     PTG.toPointsToSets(PTGSet);
 
+    ++total;
+
     if (!comparePointsToSets(S, PTGSet)) {
-        retval = 1;
+        ++failed;
 
         errs() << "Points-to graph:\n\n";
         PTG.dump();
@@ -138,16 +138,20 @@ static void check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
         errs() << "But should be\n";
         dumpPointsToSets(S);
         errs() << "\n";
+
+        return false;
     }
+
+    return true;
 }
 
-static void buildPointsToGraph(Module &M, bool (*seq)(Module&, ptr::PointsToGraph&),
+static void buildPointsToGraph(bool (*seq)(ptr::PointsToGraph&),
                                 ptr::PointsToCategories *categ = NULL)
 {
     ptr::PointsToGraph PTG(PS,
         (categ == NULL) ? new ptr::AllInSelfCategory : categ);
 
-    seq(M, PTG);
+    seq(PTG);
 }
 
 static void test_test(void)
@@ -180,14 +184,14 @@ static void test_test(void)
     assert(comparePointsToSets(A, B));
 }
 
-static bool figure1(Module& M, ptr::PointsToGraph& PTG)
+static bool figure1(ptr::PointsToGraph& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(M, PTG, "a", "b");
-    addPointsTo(M, PTG, "b", "c");
-    addPointsTo(M, PTG, "a", "d");
-    addPointsTo(M, PTG, "d", "e");
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "b", "c");
+    addPointsTo(PTG, "a", "d");
+    addPointsTo(PTG, "d", "e");
 
     // points to set for control
     // steengaards
@@ -198,33 +202,35 @@ static bool figure1(Module& M, ptr::PointsToGraph& PTG)
     addPointsTo(PTSets, "d", "c");
     addPointsTo(PTSets, "d", "e");
 
-    check(PTG, PTSets);
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
 }
 
-static bool figure2(Module& M, ptr::PointsToGraph& PTG)
+static bool figure2(ptr::PointsToGraph& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(M, PTG, "x", "v1");
-    addPointsTo(M, PTG, "x", "v2");
-    addPointsTo(M, PTG, "y", "v1");
+    addPointsTo(PTG, "x", "v1");
+    addPointsTo(PTG, "x", "v2");
+    addPointsTo(PTG, "y", "v1");
 
     addPointsTo(PTSets, "x", "v1");
     addPointsTo(PTSets, "x", "v2");
     addPointsTo(PTSets, "y", "v1");
     addPointsTo(PTSets, "y", "v2");
 
-    check(PTG, PTSets);
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
 }
 
-static bool figure3(Module& M, ptr::PointsToGraph& PTG)
+static bool figure3(ptr::PointsToGraph& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(M, PTG, "a", "b");
-    addPointsTo(M, PTG, "a", "c");
-    addPointsTo(M, PTG, "a", "d");
-    addPointsTo(M, PTG, "c", "d");
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "d");
+    addPointsTo(PTG, "c", "d");
 
     addPointsTo(PTSets, "a", "b");
     addPointsTo(PTSets, "a", "c");
@@ -239,43 +245,164 @@ static bool figure3(Module& M, ptr::PointsToGraph& PTG)
     addPointsTo(PTSets, "d", "c");
     addPointsTo(PTSets, "d", "d");
 
-    check(PTG, PTSets);
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointer1(Module &M, ptr::PointsToGraph& PTG)
+static bool derefPointer1(ptr::PointsToGraph& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(M, PTG, "a", "b");
-    addPointsTo(M, PTG, "a", "c");
-    addPointsTo(M, PTG, "a", "d", DEREF_POINTER);
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "d", DEREF_POINTER);
 
     addPointsTo(PTSets, "a", "b");
     addPointsTo(PTSets, "a", "c");
     addPointsTo(PTSets, "b", "d");
     addPointsTo(PTSets, "c", "d");
 
-    check(PTG, PTSets);
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointee1(Module &M, ptr::PointsToGraph& PTG)
+static bool derefPointer2(ptr::PointsToGraph& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(M, PTG, "a", "b");
-    addPointsTo(M, PTG, "a", "c");
-    addPointsTo(M, PTG, "d", "a", DEREF_POINTEE);
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "b", "a");
+    addPointsTo(PTG, "b", "c");
+    addPointsTo(PTG, "a", "d", DEREF_POINTER);
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "b", "a");
+    addPointsTo(PTSets, "b", "c");
+    addPointsTo(PTSets, "b", "d");
+    addPointsTo(PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 1st check of " << __func__ << "\n";
+
+    addPointsTo(PTG, "b", "d", DEREF_POINTER);
+
+    addPointsTo(PTSets, "a", "d");
+    addPointsTo(PTSets, "d", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static bool derefPointer3(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "c", "d");
+    addPointsTo(PTG, "a", "a", DEREF_POINTER);
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "c", "d");
+    addPointsTo(PTSets, "b", "a");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 1st part of " << __func__ << "\n";
+
+    addPointsTo(PTG, "e", "d", DEREF_POINTER);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 2nd part of " << __func__ << "\n";
+}
+
+static bool derefPointee1(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "d", "a", DEREF_POINTEE);
 
     addPointsTo(PTSets, "a", "b");
     addPointsTo(PTSets, "a", "c");
     addPointsTo(PTSets, "d", "b");
-    addPointsTo(PTSets, "d", "a");
+    addPointsTo(PTSets, "d", "c");
 
-    check(PTG, PTSets);
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
 }
 
+static bool derefPointee2(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
 
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "d", "c", DEREF_POINTEE);
 
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static bool derefPointee3(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "a", DEREF_POINTEE);
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 1st part of " << __func__ << "\n";
+
+    addPointsTo(PTG, "a", "a");
+    addPointsTo(PTG, "c", "a", DEREF_POINTEE);
+
+    addPointsTo(PTSets, "a", "a");
+    addPointsTo(PTSets, "c", "a");
+    addPointsTo(PTSets, "c", "b");
+    addPointsTo(PTSets, "c", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 2nd part of " << __func__ << "\n";
+
+    addPointsTo(PTG, "c", "a", DEREF_POINTEE);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for the 3rd part of " << __func__ << "\n";
+}
+
+static bool derefPointeer1(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "c", "a");
+    addPointsTo(PTG, "c", "d");
+    addPointsTo(PTG, "a", "c", DEREF_POINTER);
+    addPointsTo(PTG, "a", "c", DEREF_POINTER);
+    addPointsTo(PTG, "a", "c", DEREF_POINTEE);
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "c", "a");
+    addPointsTo(PTSets, "c", "d");
+    addPointsTo(PTSets, "b", "c");
+    addPointsTo(PTSets, "c", "c");
+    addPointsTo(PTSets, "a", "a");
+    addPointsTo(PTSets, "a", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
 
 int main(int argc, char **argv)
 {
@@ -285,16 +412,28 @@ int main(int argc, char **argv)
     // test testing functions first
     test_test();
 
-	Module M("points-to-test", getGlobalContext());
+	Module m("points-to-test", getGlobalContext());
+    M = &m;
 
-    ptr::ProgramStructure ps(M);
+    ptr::ProgramStructure ps(m);
     PS = &ps;
 
     // these are from Shapiro-Horowitz paper and simulate Steengaard's analysis
-    buildPointsToGraph(M, figure1, new ptr::AllInOneCategory());
-    buildPointsToGraph(M, figure2, new ptr::AllInOneCategory());
-    buildPointsToGraph(M, figure3, new ptr::AllInOneCategory());
+    buildPointsToGraph(figure1, new ptr::AllInOneCategory());
+    buildPointsToGraph(figure2, new ptr::AllInOneCategory());
+    buildPointsToGraph(figure3, new ptr::AllInOneCategory());
 
-    buildPointsToGraph(M, derefPointer1);
-	return retval;
+    // these use Andersen implicitly analysis
+    buildPointsToGraph(derefPointer1);
+    buildPointsToGraph(derefPointer2);
+    buildPointsToGraph(derefPointer3);
+    buildPointsToGraph(derefPointee1);
+    buildPointsToGraph(derefPointee2);
+    buildPointsToGraph(derefPointee3);
+    buildPointsToGraph(derefPointeer1);
+
+    if (failed)
+        errs() << failed << " tests from " << total << " failed!\n";
+
+	return failed != 0;
 }
