@@ -404,6 +404,152 @@ static bool derefPointeer1(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
+static std::set<std::set<Pointer> > categories1(void)
+{
+    std::set<std::set<Pointer> > Categories;
+    std::set<Pointer> C;
+
+    C.insert(getPointer("a"));
+    C.insert(getPointer("b"));
+
+    Categories.insert(C);
+    C.clear();
+
+    C.insert(getPointer("c"));
+    C.insert(getPointer("d"));
+    Categories.insert(C);
+
+    return Categories;
+}
+
+static bool fixedCateg1(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "d");
+    addPointsTo(PTG, "c", "d");
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "a", "d");
+    addPointsTo(PTSets, "c", "d");
+    addPointsTo(PTSets, "c", "c");
+    addPointsTo(PTSets, "d", "c");
+    addPointsTo(PTSets, "d", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static std::set<std::set<Pointer> > categories2(void)
+{
+    std::set<std::set<Pointer> > Categories;
+    std::set<Pointer> C;
+
+    C.insert(getPointer("a"));
+    C.insert(getPointer("c"));
+
+    Categories.insert(C);
+    C.clear();
+
+    C.insert(getPointer("b"));
+    C.insert(getPointer("d"));
+    Categories.insert(C);
+
+    return Categories;
+}
+
+static bool fixedCateg2(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "d");
+    addPointsTo(PTG, "c", "d");
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "a", "d");
+    addPointsTo(PTSets, "c", "b");
+    addPointsTo(PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static std::set<std::set<Pointer> > categories3(void)
+{
+    std::set<std::set<Pointer> > Categories;
+    std::set<Pointer> C;
+
+    C.insert(getPointer("a"));
+    C.insert(getPointer("b"));
+
+    Categories.insert(C);
+    C.clear();
+
+    C.insert(getPointer("c"));
+    Categories.insert(C);
+    C.clear();
+
+    C.insert(getPointer("d"));
+    Categories.insert(C);
+
+    return Categories;
+}
+
+static bool fixedCateg3(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "a", "d");
+    addPointsTo(PTG, "c", "d");
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "a", "d");
+    addPointsTo(PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static std::set<std::set<Pointer> > categories4(void)
+{
+    std::set<std::set<Pointer> > Categories;
+    std::set<Pointer> C;
+
+    C.insert(getPointer("b"));
+    C.insert(getPointer("c"));
+
+    Categories.insert(C);
+
+    return Categories;
+}
+
+static bool fixedCateg4(ptr::PointsToGraph& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(PTG, "a", "b");
+    addPointsTo(PTG, "a", "c");
+    addPointsTo(PTG, "c", "d");
+
+    addPointsTo(PTSets, "a", "b");
+    addPointsTo(PTSets, "a", "c");
+    addPointsTo(PTSets, "b", "d");
+    addPointsTo(PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+
 int main(int argc, char **argv)
 {
 	LLVMContext context;
@@ -423,7 +569,7 @@ int main(int argc, char **argv)
     buildPointsToGraph(figure2, new ptr::AllInOneCategory());
     buildPointsToGraph(figure3, new ptr::AllInOneCategory());
 
-    // these use Andersen implicitly analysis
+    // these use Andersen analysis
     buildPointsToGraph(derefPointer1);
     buildPointsToGraph(derefPointer2);
     buildPointsToGraph(derefPointer3);
@@ -431,6 +577,13 @@ int main(int argc, char **argv)
     buildPointsToGraph(derefPointee2);
     buildPointsToGraph(derefPointee3);
     buildPointsToGraph(derefPointeer1);
+
+    // tests with fixed categories, the first three ones are also from the
+    // Shapiro-Horwitz paper (Figure 3)
+    buildPointsToGraph(fixedCateg1, new ptr::FixedCategories(categories1()));
+    buildPointsToGraph(fixedCateg2, new ptr::FixedCategories(categories2()));
+    buildPointsToGraph(fixedCateg3, new ptr::FixedCategories(categories3()));
+    buildPointsToGraph(fixedCateg4, new ptr::FixedCategories(categories4()));
 
     if (failed)
         errs() << failed << " tests from " << total << " failed!\n";
