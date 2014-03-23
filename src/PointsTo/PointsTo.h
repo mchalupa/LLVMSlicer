@@ -97,16 +97,9 @@ namespace ptr {
     public:
         typedef PointsToSets::Pointer Pointer;
 
-        PointsToCategories() {}
         virtual ~PointsToCategories() {}
-        PointsToCategories(int K)
-        :K(K) {}
 
-        int getK(void) const { return K; }
         virtual bool areInSameCategory(Pointer a, Pointer b) const = 0;
-
-    private:
-        int K;
     };
 
     // implies Steengaard's analysis
