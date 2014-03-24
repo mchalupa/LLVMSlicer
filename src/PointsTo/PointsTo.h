@@ -272,6 +272,9 @@ namespace ptr {
 
         // apply rules until you can
         const PointsToGraph& fixpoint(void);
+
+        // tester class, must be able to access private attributes
+        friend class PTGTester;
     };
 
 } // namespace ptr

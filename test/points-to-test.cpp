@@ -6,8 +6,10 @@
 #include <cassert>
 
 #include "../src/PointsTo/PointsTo.h"
+#include "PTGTester.h"
 
 using namespace llvm;
+using ptr::PTGTester;
 
 typedef ptr::PointsToGraph::Pointer Pointer;
 typedef ptr::PointsToGraph::Pointee Pointee;
@@ -59,7 +61,7 @@ enum deref {
     DEREF_POINTER
 };
 
-static void addPointsTo(ptr::PointsToGraph &PTG,
+static void addPointsTo(PTGTester &PTG,
                         const char *a, const char *b,
                         enum deref derefFlag = DEREF_NONE)
 {
@@ -120,11 +122,11 @@ static bool comparePointsToSets(ptr::PointsToSets& a, ptr::PointsToSets& b)
     return true;
 }
 
-static bool check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
+static bool check(PTGTester &PTG, ptr::PointsToSets &S)
 {
     ptr::PointsToSets PTGSet;
 
-    PTG.toPointsToSets(PTGSet);
+    PTG.getPTG().toPointsToSets(PTGSet);
 
     ++total;
 
@@ -132,7 +134,7 @@ static bool check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
         ++failed;
 
         errs() << "Points-to graph:\n\n";
-        PTG.dump();
+        PTG.getPTG().dump();
         errs() << "\nAssocaited points-to set:\n\n";
         dumpPointsToSets(PTGSet);
         errs() << "But should be\n";
@@ -145,13 +147,14 @@ static bool check(ptr::PointsToGraph &PTG, ptr::PointsToSets &S)
     return true;
 }
 
-static void buildPointsToGraph(bool (*seq)(ptr::PointsToGraph&),
+static void buildPointsToGraph(bool (*seq)(PTGTester&),
                                 ptr::PointsToCategories *categ = NULL)
 {
     ptr::PointsToGraph PTG(PS,
         (categ == NULL) ? new ptr::AllInSelfCategory : categ);
 
-    seq(PTG);
+    PTGTester T(&PTG);
+    seq(T);
 }
 
 static void test_test(void)
@@ -184,7 +187,7 @@ static void test_test(void)
     assert(comparePointsToSets(A, B));
 }
 
-static bool figure1(ptr::PointsToGraph& PTG)
+static bool figure1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -206,7 +209,7 @@ static bool figure1(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool figure2(ptr::PointsToGraph& PTG)
+static bool figure2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -223,7 +226,7 @@ static bool figure2(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool figure3(ptr::PointsToGraph& PTG)
+static bool figure3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -249,7 +252,7 @@ static bool figure3(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointer1(ptr::PointsToGraph& PTG)
+static bool derefPointer1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -266,7 +269,7 @@ static bool derefPointer1(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointer2(ptr::PointsToGraph& PTG)
+static bool derefPointer2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -295,7 +298,7 @@ static bool derefPointer2(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointer3(ptr::PointsToGraph& PTG)
+static bool derefPointer3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -316,7 +319,7 @@ static bool derefPointer3(ptr::PointsToGraph& PTG)
         errs() << "dump for the 2nd part of " << __func__ << "\n";
 }
 
-static bool derefPointee1(ptr::PointsToGraph& PTG)
+static bool derefPointee1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -333,7 +336,7 @@ static bool derefPointee1(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointee2(ptr::PointsToGraph& PTG)
+static bool derefPointee2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -348,7 +351,7 @@ static bool derefPointee2(ptr::PointsToGraph& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static bool derefPointee3(ptr::PointsToGraph& PTG)
+static bool derefPointee3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -379,7 +382,7 @@ static bool derefPointee3(ptr::PointsToGraph& PTG)
         errs() << "dump for the 3rd part of " << __func__ << "\n";
 }
 
-static bool derefPointeer1(ptr::PointsToGraph& PTG)
+static bool derefPointeer1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -422,7 +425,7 @@ static std::set<std::set<Pointer> > categories1(void)
     return Categories;
 }
 
-static bool fixedCateg1(ptr::PointsToGraph& PTG)
+static bool fixedCateg1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -461,7 +464,7 @@ static std::set<std::set<Pointer> > categories2(void)
     return Categories;
 }
 
-static bool fixedCateg2(ptr::PointsToGraph& PTG)
+static bool fixedCateg2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -501,7 +504,7 @@ static std::set<std::set<Pointer> > categories3(void)
     return Categories;
 }
 
-static bool fixedCateg3(ptr::PointsToGraph& PTG)
+static bool fixedCateg3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
@@ -532,7 +535,7 @@ static std::set<std::set<Pointer> > categories4(void)
     return Categories;
 }
 
-static bool fixedCateg4(ptr::PointsToGraph& PTG)
+static bool fixedCateg4(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
