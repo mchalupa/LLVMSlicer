@@ -51,3 +51,35 @@ private:
 
 } // namespace ptr
 } // namespace llvm
+
+
+// helper functions
+// ------------------------------
+using namespace llvm::ptr;
+
+void dumpPointsToSets(PointsToSets& PS);
+bool comparePointsToSets(PointsToSets& a, PointsToSets& b);
+
+// get pointer with given name. All such pointers are globals
+// and should be used for testing PTG insert logic only.
+// For other testing must be used working Module with real Values
+PointsToGraph::Pointer getPointer(llvm::Module *M, const char *name);
+
+enum deref {
+    DEREF_NONE,
+    DEREF_POINTEE,
+    DEREF_POINTER
+};
+
+// insert new points-to pair into PTG
+void addPointsTo(llvm::Module *M, PTGTester &PTG,
+                 const char *a, const char *b,
+                 enum deref derefFlag = DEREF_NONE);
+
+// add points-to pair to control points-to set
+void addPointsTo(llvm::Module *M, PointsToSets& PTSets,
+                 const char *a, const char *b);
+
+bool check(PTGTester &PTG, PointsToSets &S);
+
+std::pair<int, int> getResults(void);

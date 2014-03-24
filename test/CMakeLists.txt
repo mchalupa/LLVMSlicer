@@ -1,6 +1,6 @@
 add_executable(field-sensitive-test field-sensitive-test.cpp)
 add_executable(dump-points-to dump-points-to.cpp)
-add_executable(points-to-test points-to-test.cpp)
+add_executable(points-to-test points-to-test.cpp PTGTester.cpp)
 
 llvm_map_components_to_libraries(FST_LLVM_LIBS core engine asmparser bitreader bitwriter)
 

@@ -16,136 +16,6 @@ typedef ptr::PointsToGraph::Pointee Pointee;
 
 static Module *M;
 static ptr::ProgramStructure *PS;
-static std::map<const char *, Pointer> valueMap;
-
-static int failed = 0;
-static int total = 0;
-
-static void dumpPointsToSets(ptr::PointsToSets& PS)
-{
-    ptr::PointsToSets::const_iterator I, E;
-    ptr::PointsToSets::PointsToSet::const_iterator II, EE;
-
-    for (I = PS.begin(), E = PS.end(); I != E; ++I) {
-        errs() << "PTR: ";
-        I->first.first->dump();
-
-        for (II = I->second.cbegin(), EE = I->second.cend(); II != EE; ++II) {
-            errs() << "    --> ";
-            II->first->dump();
-        }
-    }
-}
-
-// get or create value
-static Pointer getPointer(const char *name)
-{
-    std::map<const char *, Pointer>::iterator I = valueMap.find(name);
-
-    if (I == valueMap.end()) {
-        Value *va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
-                                         false,
-                                         GlobalValue::CommonLinkage, 0 , name);
-        Pointer p(va, -1);
-        valueMap.insert(std::make_pair(name, p));
-
-        return p;
-    }
-
-    return I->second;
-}
-
-enum deref {
-    DEREF_NONE,
-    DEREF_POINTEE,
-    DEREF_POINTER
-};
-
-static void addPointsTo(PTGTester &PTG,
-                        const char *a, const char *b,
-                        enum deref derefFlag = DEREF_NONE)
-{
-    Pointer pa, pb;
-
-    pa = getPointer(a);
-    pb = getPointer(b);
-
-    switch (derefFlag) {
-    case DEREF_NONE:
-        PTG.insert(pa, pb); break;
-    case DEREF_POINTEE:
-        PTG.insertDerefPointee(pa, pb); break;
-    case DEREF_POINTER:
-        PTG.insertDerefPointer(pa, pb); break;
-    default:
-        assert(0);
-    }
-}
-
-static void addPointsTo(ptr::PointsToSets& PTSets,
-                        const char *a, const char *b)
-{
-    Pointer p = getPointer(a);
-    Pointee l = getPointer(b);
-
-    ptr::PointsToSets::PointsToSet& S = PTSets[p];
-    S.insert(l);
-}
-
-static bool comparePointsToSets(ptr::PointsToSets& a, ptr::PointsToSets& b)
-{
-    ptr::PointsToSets::const_iterator I1, E1, I2;
-    ptr::PointsToSets::PointsToSet::const_iterator PI1, PE1, PI2;
-
-    if (a.getContainer().size() != b.getContainer().size())
-        return false;
-
-    // the sets should have the same order, compare item by item
-    for (I1 = a.begin(), E1 = a.end(), I2 = b.begin();
-            I1 != E1; ++I1, ++I2) {
-
-        const ptr::PointsToSets::PointsToSet& A = I1->second;
-        const ptr::PointsToSets::PointsToSet& B = I2->second;
-
-        if (A.size() != B.size())
-            return false;
-
-        for (PI1 = A.begin(), PI2 = B.begin(), PE1 = A.end();
-                PI1 != PE1; ++PI1, ++PI2) {
-
-            if (*PI1 != *PI2)
-                return false;
-        }
-
-    }
-
-    return true;
-}
-
-static bool check(PTGTester &PTG, ptr::PointsToSets &S)
-{
-    ptr::PointsToSets PTGSet;
-
-    PTG.getPTG().toPointsToSets(PTGSet);
-
-    ++total;
-
-    if (!comparePointsToSets(S, PTGSet)) {
-        ++failed;
-
-        errs() << "Points-to graph:\n\n";
-        PTG.getPTG().dump();
-        errs() << "\nAssocaited points-to set:\n\n";
-        dumpPointsToSets(PTGSet);
-        errs() << "But should be\n";
-        dumpPointsToSets(S);
-        errs() << "\n";
-
-        return false;
-    }
-
-    return true;
-}
 
 static void buildPointsToGraph(bool (*seq)(PTGTester&),
                                 ptr::PointsToCategories *categ = NULL)
@@ -191,19 +61,19 @@ static bool figure1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "b", "c");
-    addPointsTo(PTG, "a", "d");
-    addPointsTo(PTG, "d", "e");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "b", "c");
+    addPointsTo(M, PTG, "a", "d");
+    addPointsTo(M, PTG, "d", "e");
 
     // points to set for control
     // steengaards
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "b", "c");
-    addPointsTo(PTSets, "b", "e");
-    addPointsTo(PTSets, "d", "c");
-    addPointsTo(PTSets, "d", "e");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "b", "e");
+    addPointsTo(M, PTSets, "d", "c");
+    addPointsTo(M, PTSets, "d", "e");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -213,14 +83,14 @@ static bool figure2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "x", "v1");
-    addPointsTo(PTG, "x", "v2");
-    addPointsTo(PTG, "y", "v1");
+    addPointsTo(M, PTG, "x", "v1");
+    addPointsTo(M, PTG, "x", "v2");
+    addPointsTo(M, PTG, "y", "v1");
 
-    addPointsTo(PTSets, "x", "v1");
-    addPointsTo(PTSets, "x", "v2");
-    addPointsTo(PTSets, "y", "v1");
-    addPointsTo(PTSets, "y", "v2");
+    addPointsTo(M, PTSets, "x", "v1");
+    addPointsTo(M, PTSets, "x", "v2");
+    addPointsTo(M, PTSets, "y", "v1");
+    addPointsTo(M, PTSets, "y", "v2");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -230,23 +100,23 @@ static bool figure3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "d");
-    addPointsTo(PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "d");
+    addPointsTo(M, PTG, "c", "d");
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "b", "b");
-    addPointsTo(PTSets, "b", "c");
-    addPointsTo(PTSets, "b", "d");
-    addPointsTo(PTSets, "c", "b");
-    addPointsTo(PTSets, "c", "c");
-    addPointsTo(PTSets, "c", "d");
-    addPointsTo(PTSets, "d", "b");
-    addPointsTo(PTSets, "d", "c");
-    addPointsTo(PTSets, "d", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "b", "b");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "b");
+    addPointsTo(M, PTSets, "c", "c");
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "d", "b");
+    addPointsTo(M, PTSets, "d", "c");
+    addPointsTo(M, PTSets, "d", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -256,14 +126,14 @@ static bool derefPointer1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "d", DEREF_POINTER);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "d", DEREF_POINTER);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "b", "d");
-    addPointsTo(PTSets, "c", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -273,26 +143,26 @@ static bool derefPointer2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "b", "a");
-    addPointsTo(PTG, "b", "c");
-    addPointsTo(PTG, "a", "d", DEREF_POINTER);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "b", "a");
+    addPointsTo(M, PTG, "b", "c");
+    addPointsTo(M, PTG, "a", "d", DEREF_POINTER);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "b", "a");
-    addPointsTo(PTSets, "b", "c");
-    addPointsTo(PTSets, "b", "d");
-    addPointsTo(PTSets, "c", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "a");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 1st check of " << __func__ << "\n";
 
-    addPointsTo(PTG, "b", "d", DEREF_POINTER);
+    addPointsTo(M, PTG, "b", "d", DEREF_POINTER);
 
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "d", "d");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "d", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -302,18 +172,18 @@ static bool derefPointer3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "c", "d");
-    addPointsTo(PTG, "a", "a", DEREF_POINTER);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "a", DEREF_POINTER);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "c", "d");
-    addPointsTo(PTSets, "b", "a");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "b", "a");
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 1st part of " << __func__ << "\n";
 
-    addPointsTo(PTG, "e", "d", DEREF_POINTER);
+    addPointsTo(M, PTG, "e", "d", DEREF_POINTER);
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 2nd part of " << __func__ << "\n";
@@ -323,14 +193,14 @@ static bool derefPointee1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "d", "a", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "d", "a", DEREF_POINTEE);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "d", "b");
-    addPointsTo(PTSets, "d", "c");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "d", "b");
+    addPointsTo(M, PTSets, "d", "c");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -340,12 +210,12 @@ static bool derefPointee2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "d", "c", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "d", "c", DEREF_POINTEE);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -355,28 +225,28 @@ static bool derefPointee3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "a", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "a", DEREF_POINTEE);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 1st part of " << __func__ << "\n";
 
-    addPointsTo(PTG, "a", "a");
-    addPointsTo(PTG, "c", "a", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "a");
+    addPointsTo(M, PTG, "c", "a", DEREF_POINTEE);
 
-    addPointsTo(PTSets, "a", "a");
-    addPointsTo(PTSets, "c", "a");
-    addPointsTo(PTSets, "c", "b");
-    addPointsTo(PTSets, "c", "c");
+    addPointsTo(M, PTSets, "a", "a");
+    addPointsTo(M, PTSets, "c", "a");
+    addPointsTo(M, PTSets, "c", "b");
+    addPointsTo(M, PTSets, "c", "c");
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 2nd part of " << __func__ << "\n";
 
-    addPointsTo(PTG, "c", "a", DEREF_POINTEE);
+    addPointsTo(M, PTG, "c", "a", DEREF_POINTEE);
 
     if (!check(PTG, PTSets))
         errs() << "dump for the 3rd part of " << __func__ << "\n";
@@ -386,22 +256,22 @@ static bool derefPointeer1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "c", "a");
-    addPointsTo(PTG, "c", "d");
-    addPointsTo(PTG, "a", "c", DEREF_POINTER);
-    addPointsTo(PTG, "a", "c", DEREF_POINTER);
-    addPointsTo(PTG, "a", "c", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "a");
+    addPointsTo(M, PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "c", DEREF_POINTER);
+    addPointsTo(M, PTG, "a", "c", DEREF_POINTER);
+    addPointsTo(M, PTG, "a", "c", DEREF_POINTEE);
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "c", "a");
-    addPointsTo(PTSets, "c", "d");
-    addPointsTo(PTSets, "b", "c");
-    addPointsTo(PTSets, "c", "c");
-    addPointsTo(PTSets, "a", "a");
-    addPointsTo(PTSets, "a", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "a");
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "c", "c");
+    addPointsTo(M, PTSets, "a", "a");
+    addPointsTo(M, PTSets, "a", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -412,14 +282,14 @@ static std::set<std::set<Pointer> > categories1(void)
     std::set<std::set<Pointer> > Categories;
     std::set<Pointer> C;
 
-    C.insert(getPointer("a"));
-    C.insert(getPointer("b"));
+    C.insert(getPointer(M, "a"));
+    C.insert(getPointer(M, "b"));
 
     Categories.insert(C);
     C.clear();
 
-    C.insert(getPointer("c"));
-    C.insert(getPointer("d"));
+    C.insert(getPointer(M, "c"));
+    C.insert(getPointer(M, "d"));
     Categories.insert(C);
 
     return Categories;
@@ -429,18 +299,18 @@ static bool fixedCateg1(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "d");
-    addPointsTo(PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "d");
+    addPointsTo(M, PTG, "c", "d");
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "c", "d");
-    addPointsTo(PTSets, "c", "c");
-    addPointsTo(PTSets, "d", "c");
-    addPointsTo(PTSets, "d", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "c", "c");
+    addPointsTo(M, PTSets, "d", "c");
+    addPointsTo(M, PTSets, "d", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -451,14 +321,14 @@ static std::set<std::set<Pointer> > categories2(void)
     std::set<std::set<Pointer> > Categories;
     std::set<Pointer> C;
 
-    C.insert(getPointer("a"));
-    C.insert(getPointer("c"));
+    C.insert(getPointer(M, "a"));
+    C.insert(getPointer(M, "c"));
 
     Categories.insert(C);
     C.clear();
 
-    C.insert(getPointer("b"));
-    C.insert(getPointer("d"));
+    C.insert(getPointer(M, "b"));
+    C.insert(getPointer(M, "d"));
     Categories.insert(C);
 
     return Categories;
@@ -468,16 +338,16 @@ static bool fixedCateg2(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "d");
-    addPointsTo(PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "d");
+    addPointsTo(M, PTG, "c", "d");
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "c", "b");
-    addPointsTo(PTSets, "c", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "c", "b");
+    addPointsTo(M, PTSets, "c", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -488,17 +358,17 @@ static std::set<std::set<Pointer> > categories3(void)
     std::set<std::set<Pointer> > Categories;
     std::set<Pointer> C;
 
-    C.insert(getPointer("a"));
-    C.insert(getPointer("b"));
+    C.insert(getPointer(M, "a"));
+    C.insert(getPointer(M, "b"));
 
     Categories.insert(C);
     C.clear();
 
-    C.insert(getPointer("c"));
+    C.insert(getPointer(M, "c"));
     Categories.insert(C);
     C.clear();
 
-    C.insert(getPointer("d"));
+    C.insert(getPointer(M, "d"));
     Categories.insert(C);
 
     return Categories;
@@ -508,15 +378,15 @@ static bool fixedCateg3(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "a", "d");
-    addPointsTo(PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "d");
+    addPointsTo(M, PTG, "c", "d");
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "a", "d");
-    addPointsTo(PTSets, "c", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "c", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -527,8 +397,8 @@ static std::set<std::set<Pointer> > categories4(void)
     std::set<std::set<Pointer> > Categories;
     std::set<Pointer> C;
 
-    C.insert(getPointer("b"));
-    C.insert(getPointer("c"));
+    C.insert(getPointer(M, "b"));
+    C.insert(getPointer(M, "c"));
 
     Categories.insert(C);
 
@@ -539,14 +409,14 @@ static bool fixedCateg4(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
 
-    addPointsTo(PTG, "a", "b");
-    addPointsTo(PTG, "a", "c");
-    addPointsTo(PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "d");
 
-    addPointsTo(PTSets, "a", "b");
-    addPointsTo(PTSets, "a", "c");
-    addPointsTo(PTSets, "b", "d");
-    addPointsTo(PTSets, "c", "d");
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "d");
 
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
@@ -588,8 +458,10 @@ int main(int argc, char **argv)
     buildPointsToGraph(fixedCateg3, new ptr::FixedCategories(categories3()));
     buildPointsToGraph(fixedCateg4, new ptr::FixedCategories(categories4()));
 
-    if (failed)
-        errs() << failed << " tests from " << total << " failed!\n";
+    std::pair<int, int>results = getResults();
 
-	return failed != 0;
+    if (results.first)
+        errs() << results.first << " tests from " << results.second << " failed!\n";
+
+	return results.first != 0;
 }
