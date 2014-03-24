@@ -153,15 +153,6 @@ namespace ptr {
         typedef PointsToSets::Pointee Pointee;
 
         PointsToSets& toPointsToSets(PointsToSets& PS) const;
-
-        // insert that p points to location
-        bool insert(Pointer p, Pointee location);
-
-        // insert all pairs a->b where b is every pointer
-        // the Pointee can points to
-        // make these public for testing
-        bool insertDerefPointee(Pointer p, Pointee location);
-        bool insertDerefPointer(Pointer p, Pointee location);
         void dump(void) const;
 
     private:
@@ -212,8 +203,14 @@ namespace ptr {
             return PTC;
         }
 
-        // insert that p points to all Pointees from locations
+        // insert that p points to location
+        bool insert(Pointer p, Pointee location);
+       // insert that p points to all Pointees from locations
         bool insert(Pointer p, std::set<Pointee>& locations);
+        // insert all pairs a->b where b is every pointer
+        // the Pointee can points to
+        bool insertDerefPointee(Pointer p, Pointee location);
+        bool insertDerefPointer(Pointer p, Pointee location);
         bool insertDerefPointee(Pointer p, Node *LocationNode);
         bool insertDerefPointee(Node *PointerNode, Node *LocationNode);
         bool insertDerefPointer(Node *PointerNode, Pointee location);
