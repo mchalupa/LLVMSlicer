@@ -557,11 +557,6 @@ PointsToSets& PointsToGraph::toPointsToSets(PointsToSets& PS) const
     return PS;
 }
 
-void PointsToGraph::buildGraph(void)
-{
-}
-
-
 } // namespace ptr
 } // namespace llvm
 
@@ -570,15 +565,15 @@ namespace llvm { namespace ptr {
 typedef PointsToSets::PointsToSet PTSet;
 typedef PointsToSets::Pointer Ptr;
 
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            VARIABLE<const llvm::Value *>
-                        > const& E) {
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                VARIABLE<const llvm::Value *>
+                              > const& E)
+{
     const llvm::Value *lval = E.getArgument1().getArgument();
     const llvm::Value *rval = E.getArgument2().getArgument();
 
-    return PTG.insertDerefPointee(Ptr(lval, -1), Ptr(rval, -1));
+    return insertDerefPointee(Ptr(lval, -1), Ptr(rval, -1));
 }
 
 static int64_t accumulateConstantOffset(const GetElementPtrInst *gep,
@@ -628,11 +623,12 @@ static bool checkOffset(const DataLayout &DL, const Value *Rval, uint64_t sum) {
   return true;
 }
 
-static bool applyRule(PointsToGraph& PTG, const llvm::DataLayout &DL,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            GEP<VARIABLE<const llvm::Value *> >
-                        > const& E) {
+bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
+                              ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                GEP<VARIABLE<const llvm::Value *> >
+                              > const& E)
+{
     const llvm::Value *lval = E.getArgument1().getArgument();
     const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
     bool changed = false;
@@ -641,162 +637,225 @@ static bool applyRule(PointsToGraph& PTG, const llvm::DataLayout &DL,
     const llvm::Value *op = elimConstExpr(gep->getPointerOperand());
     bool isArray = false;
     int64_t off = accumulateConstantOffset(gep, DL, isArray);
+    Ptr L = Ptr(lval, -1);
 
     if (hasExtraReference(op)) {
-        changed = PTG.insert(Ptr(lval, -1), Ptr(op, off)); /* VAR = REF */
-    } else {
-        if (checkOffset(DL, rval, off))
-            changed = PTG.insert(Ptr(lval, -1), Ptr(op, off));
+        changed = insert(L, Ptr(op, off)); /* VAR = REF */
+    } else { /* VAR = VAR */
+        Ptr R(op, -1);
+        Node *n = findNode(R);
+
+        if (!n)
+            return false;
+
+        if (!n->hasNeighbours())
+            return false;
+
+        std::set<Node *>& Edges = n->getEdges();
+        std::set<Node *>::const_iterator NI, NE;
+        std::set<Pointee>::const_iterator PI, PE;
+        for (NI = Edges.cbegin(), NE = Edges.cend(); NI != NE; ++NI) {
+            std::set<Pointee>& Elems = (*NI)->getElements();
+            for (PI = Elems.cbegin(), PE = Elems.cend(); PI != PE; ++PI) {
+                assert(PI->second >= 0);
+
+                const Value *val = PI->first;
+
+                if (off && (isa<Function>(val) || isa<ConstantPointerNull>(val)))
+                    continue;
+
+                int64_t sum = PI->second + off;
+
+                if (!checkOffset(DL, val, sum))
+                    continue;
+
+                // XXX crop > 64
+                if (sum < 0) {
+                    assert (PI->second >= 0);
+                    sum = 0;
+                }
+
+                /* an unsoudness :) */
+                if (isArray && sum > 64)
+                    sum = 64;
+
+                changed |= insert(L, Ptr(val, sum));
+            }
+        }
     }
 
     return changed;
 }
 
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            REFERENCE<VARIABLE<const llvm::Value *> >
-                        > const& E) {
-    const llvm::Value *lval = E.getArgument1().getArgument();
-    const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
-
-    return PTG.insert(Ptr(lval, -1), Ptr(rval, 0));
-}
-
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            DEREFERENCE< VARIABLE<const llvm::Value *> >
-                        > const& E, const int idx = -1)
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                REFERENCE<VARIABLE<const llvm::Value *> >
+                              > const& E)
 {
     const llvm::Value *lval = E.getArgument1().getArgument();
     const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
 
-    return PTG.insertDerefPointee(Ptr(lval, idx), Ptr(rval, -1));
+    return insert(Ptr(lval, -1), Ptr(rval, 0));
 }
 
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            DEREFERENCE<VARIABLE<const llvm::Value *> >,
-                            VARIABLE<const llvm::Value *>
-                        > const& E)
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                DEREFERENCE< VARIABLE<const llvm::Value *> >
+                              > const& E, const int idx)
 {
-    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
-    const llvm::Value *rval = E.getArgument2().getArgument();
-
-    PTG.insertDerefPointer(Ptr(lval, -1), Ptr(rval, -1));
-}
-
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            DEREFERENCE<VARIABLE<const llvm::Value *> >,
-                            REFERENCE<VARIABLE<const llvm::Value *> >
-                        > const &E)
-{
-    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
+    const llvm::Value *lval = E.getArgument1().getArgument();
     const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
-
-    return PTG.insertDerefPointer(Ptr(lval, -1), Ptr(rval, 0));
-}
-
-static void derefForeachFunc(PointsToGraph::Pointee P,
-                                PointsToGraph& PTG,
-                                std::pair<bool *, const llvm::Value *> Data)
-{
-    bool *changed = Data.first;
-    const llvm::Value *rval = Data.second;
-
-    *changed |= applyRule(PTG, (ruleVar(P.first) = *ruleVar(rval)).getSort(),
-                            P.second);
-}
-
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            DEREFERENCE<VARIABLE<const llvm::Value *> >,
-                            DEREFERENCE<VARIABLE<const llvm::Value *> >
-                        > const& E)
-{
-    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
-    const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
-
     bool change = false;
 
-    PTG.forEachFromNode<>(Ptr(lval, -1), derefForeachFunc,
-                        std::pair<bool *, const llvm::Value *>(&change, rval));
+    Ptr L(lval, idx);
+
+    Node *r = findNode(Ptr(rval, -1));
+    if (!r)
+        return false;
+
+    std::set<Node *>::const_iterator II, EE;
+    std::set<Node *>& Edges = r->getEdges();
+    for (II = Edges.cbegin(), EE = Edges.cend(); II != EE; ++II)
+        // must process nodes *two* steps away
+        change |= insertDerefPointee(L, *II);
 
     return change;
 }
 
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            ALLOC<const llvm::Value *>
-                        > const &E)
-{
-    const llvm::Value *lval = E.getArgument1().getArgument();
-    const llvm::Value *rval = E.getArgument2().getArgument();
-
-    PTG.insert(Ptr(lval, -1), Ptr(rval, 0));
-}
-
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            VARIABLE<const llvm::Value *>,
-                            NULLPTR<const llvm::Value *>
-                        > const &E)
-{
-    const llvm::Value *lval = E.getArgument1().getArgument();
-    const llvm::Value *rval = E.getArgument2().getArgument();
-
-    PTG.insert(Ptr(lval, -1), Ptr(rval, 0));
-}
-
-static bool applyRule(PointsToGraph& PTG,
-                        ASSIGNMENT<
-                            DEREFERENCE<VARIABLE<const llvm::Value *> >,
-                            NULLPTR<const llvm::Value *>
-                        > const &E)
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                                VARIABLE<const llvm::Value *>
+                              > const& E)
 {
     const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
     const llvm::Value *rval = E.getArgument2().getArgument();
 
-    PTG.insertDerefPointer(Ptr(lval, -1), Ptr(rval, 0));
+    Node *l = findNode(Ptr(lval, -1));
+    if (!l)
+        return false;
+
+    Node *r = findNode(Ptr(rval, -1));
+    if (!r)
+         return false;
+
+    return insertDerefBoth(l, r);
 }
 
-static bool applyRule(PointsToGraph& PTG, DEALLOC<const llvm::Value *>) {
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                                REFERENCE<VARIABLE<const llvm::Value *> >
+                              > const &E)
+{
+    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
+    const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
+
+    Node *l = findNode(Ptr(lval, -1));
+    if (!l)
+        return false;
+
+    return insertDerefPointer(l, Ptr(rval, 0));
+}
+
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                                DEREFERENCE<VARIABLE<const llvm::Value *> >
+                              > const& E)
+{
+    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
+    const llvm::Value *rval = E.getArgument2().getArgument().getArgument();
+    bool change = false;
+
+    Node *l = findNode(Ptr(lval, -1));
+
+    if (!l)
+        return false;
+
+    std::set<Pointer>::const_iterator I2, E2;
+    std::set<Node *>::const_iterator II, EE;
+    std::set<Node *>& Edges = l->getEdges();
+    for (II = Edges.cbegin(), EE = Edges.cend(); II != EE; ++II)
+        for (I2 = (*II)->getElements().cbegin(), E2 = (*II)->getElements().cend();
+             I2 != E2; ++I2)
+            change != applyRule((ruleVar(I2->first) = *ruleVar(rval)).getSort(),
+                            I2->second /* offset */);
+
+    return change;
+}
+
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                ALLOC<const llvm::Value *>
+                              > const &E)
+{
+    const llvm::Value *lval = E.getArgument1().getArgument();
+    const llvm::Value *rval = E.getArgument2().getArgument();
+
+    return insert(Ptr(lval, -1), Ptr(rval, 0));
+}
+
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                VARIABLE<const llvm::Value *>,
+                                NULLPTR<const llvm::Value *>
+                              > const &E)
+{
+    const llvm::Value *lval = E.getArgument1().getArgument();
+    const llvm::Value *rval = E.getArgument2().getArgument();
+
+    assert(isa<ConstantPointerNull>(rval) && "Not a NULL");
+
+    return insert(Ptr(lval, -1), Ptr(rval, 0));
+}
+
+bool PointsToGraph::applyRule(ASSIGNMENT<
+                                DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                                NULLPTR<const llvm::Value *>
+                              > const &E)
+{
+    const llvm::Value *lval = E.getArgument1().getArgument().getArgument();
+    const llvm::Value *rval = E.getArgument2().getArgument();
+
+    assert(isa<ConstantPointerNull>(rval) && "Not a NULL");
+
+    Node *l = findNode(Ptr(lval, -1));
+    if (!l)
+        return false;
+
+    return insertDerefPointer(l, Ptr(rval, 0));
+}
+
+bool PointsToGraph::applyRule(DEALLOC<const llvm::Value *>) {
     return false;
 }
 
-static bool applyRules(const RuleCode &RC, PointsToGraph& PTG,
-                        const llvm::DataLayout &DL)
+bool PointsToGraph::applyRules(const RuleCode &RC, const llvm::DataLayout &DL)
 {
     const llvm::Value *lval = RC.getLvalue();
     const llvm::Value *rval = RC.getRvalue();
 
     switch (RC.getType()) {
     case RCT_VAR_ASGN_ALLOC:
-        return applyRule(PTG, (ruleVar(lval) = ruleAllocSite(rval)).getSort());
+        return applyRule((ruleVar(lval) = ruleAllocSite(rval)).getSort());
     case RCT_VAR_ASGN_NULL:
-        return applyRule(PTG, (ruleVar(lval) = ruleNull(rval)).getSort());
+        return applyRule((ruleVar(lval) = ruleNull(rval)).getSort());
     case RCT_VAR_ASGN_VAR:
-        return applyRule(PTG, (ruleVar(lval) = ruleVar(rval)).getSort());
+        return applyRule((ruleVar(lval) = ruleVar(rval)).getSort());
     case RCT_VAR_ASGN_GEP:
-        return applyRule(PTG, DL,
+        return applyRule(DL,
                         (ruleVar(lval) = ruleVar(rval).gep()).getSort());
     case RCT_VAR_ASGN_REF_VAR:
-        return applyRule(PTG, (ruleVar(lval) = &ruleVar(rval)).getSort());
+        return applyRule((ruleVar(lval) = &ruleVar(rval)).getSort());
     case RCT_VAR_ASGN_DREF_VAR:
-        return applyRule(PTG, (ruleVar(lval) = *ruleVar(rval)).getSort());
+        return applyRule((ruleVar(lval) = *ruleVar(rval)).getSort());
     case RCT_DREF_VAR_ASGN_NULL:
-        return applyRule(PTG, (*ruleVar(lval) = ruleNull(rval)).getSort());
+        return applyRule((*ruleVar(lval) = ruleNull(rval)).getSort());
     case RCT_DREF_VAR_ASGN_VAR:
-        return applyRule(PTG, (*ruleVar(lval) = ruleVar(rval)).getSort());
+        return applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
     case RCT_DREF_VAR_ASGN_REF_VAR:
-        return applyRule(PTG, (*ruleVar(lval) = &ruleVar(rval)).getSort());
+        return applyRule((*ruleVar(lval) = &ruleVar(rval)).getSort());
     case RCT_DREF_VAR_ASGN_DREF_VAR:
-        return applyRule(PTG, (*ruleVar(lval) = *ruleVar(rval)).getSort());
+        return applyRule((*ruleVar(lval) = *ruleVar(rval)).getSort());
     case RCT_DEALLOC:
-        return applyRule(PTG, ruleDeallocSite(RC.getValue()).getSort());
+        return applyRule(ruleDeallocSite(RC.getValue()).getSort());
     default:
         assert(0 && "Unknown rule code");
     }
@@ -849,26 +908,26 @@ static PointsToSets &pruneByType(PointsToSets &S) {
   return S;
 }
 
-static PointsToGraph& fixpoint(const ProgramStructure &P, PointsToGraph& PTG)
+const PointsToGraph& PointsToGraph::fixpoint(void)
 {
   bool change;
 
-  DataLayout DL(&P.getModule());
+  DataLayout DL(&PS->getModule());
 
   do {
     change = false;
 
-    for (ProgramStructure::const_iterator i = P.begin(); i != P.end(); ++i)
-      change |= applyRules(*i, PTG, DL);
+    for (ProgramStructure::const_iterator I = PS->begin(); I != PS->end(); ++I) {
+      change |= applyRules(*I, DL);
+    }
   } while (change);
 
-  return PTG;
+  return *this;
 }
 
 PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S) {
     // TODO categories
     PointsToGraph PTG(&P, new AllInSelfCategory());
-    fixpoint(P, PTG);
 
 #ifdef PTG_DEBUG
     errs() << "Computed this PTG:\n";

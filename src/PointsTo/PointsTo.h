@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "llvm/Value.h"
+#include "llvm/DataLayout.h"
 
 #include "RuleExpressions.h"
 
@@ -143,7 +144,7 @@ namespace ptr {
         PointsToGraph(const ProgramStructure *PS, PointsToCategories *PTC)
         :PS(PS), PTC(PTC)
         {
-            buildGraph();
+            fixpoint();
         }
 
         virtual ~PointsToGraph();
@@ -206,7 +207,6 @@ namespace ptr {
             std::set<Node *> Edges; // edges to another nodes
         };
 
-        void buildGraph();
         const PointsToCategories *getCategories(void) const
         {
             return PTC;
@@ -232,6 +232,49 @@ namespace ptr {
         std::set<Node *> Nodes;
         const ProgramStructure *PS;
         PointsToCategories *PTC;
+
+        // --------------------------------------------------------------------
+        // applyRules functions -> convert ruleCodes into points-to-graph
+        // --------------------------------------------------------------------
+        bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                       VARIABLE<const llvm::Value *> > const& E);
+
+        bool applyRule(const llvm::DataLayout &DL, ASSIGNMENT<
+                       VARIABLE<const llvm::Value *>,
+                       GEP<VARIABLE<const llvm::Value *> > > const& E);
+
+        bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                       REFERENCE<VARIABLE<const llvm::Value *> > > const& E);
+
+        bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                       DEREFERENCE< VARIABLE<const llvm::Value *> >
+                       > const& E, const int idx = -1);
+
+        bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                       VARIABLE<const llvm::Value *> > const& E);
+
+        bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                       REFERENCE<VARIABLE<const llvm::Value *> > > const &E);
+
+        bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                       DEREFERENCE<VARIABLE<const llvm::Value *> > > const& E);
+
+        bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                       ALLOC<const llvm::Value *> > const &E);
+
+        bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                       NULLPTR<const llvm::Value *> > const &E);
+
+        bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                       NULLPTR<const llvm::Value *> > const &E);
+
+        bool applyRule(DEALLOC<const llvm::Value *>);
+
+        // apply the right applyRule() for RuleCode
+        bool applyRules(const RuleCode &RC, const llvm::DataLayout &DL);
+
+        // apply rules until you can
+        const PointsToGraph& fixpoint(void);
     };
 
 } // namespace ptr
