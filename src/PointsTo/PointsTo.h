@@ -158,6 +158,7 @@ namespace ptr {
 
         // insert all pairs a->b where b is every pointer
         // the Pointee can points to
+        // make these public for testing
         bool insertDerefPointee(Pointer p, Pointee location);
         bool insertDerefPointer(Pointer p, Pointee location);
         void dump(void) const;
@@ -213,6 +214,11 @@ namespace ptr {
 
         // insert that p points to all Pointees from locations
         bool insert(Pointer p, std::set<Pointee>& locations);
+        bool insertDerefPointee(Pointer p, Node *LocationNode);
+        bool insertDerefPointee(Node *PointerNode, Node *LocationNode);
+        bool insertDerefPointer(Node *PointerNode, Pointee location);
+        bool insertDerefPointer(Node *PointerNode, Node *LocationNode);
+        bool insertDerefBoth(Node *PointerNode, Node *LocationNode);
 
         // return Node that the pointee should be merged to
         // or NULL

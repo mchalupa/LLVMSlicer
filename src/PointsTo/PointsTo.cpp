@@ -419,9 +419,35 @@ bool PointsToGraph::insert(Pointer p, std::set<Pointee>& locations)
     return changed;
 }
 
+bool PointsToGraph::insertDerefPointee(Node *PointerNode, Node *LocationNode)
+{
+    bool changed = false;
+
+    std::set<PointsToGraph::Node *>::iterator I, E;
+    std::set<PointsToGraph::Node *>& Edges = LocationNode->getEdges();
+
+    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+       changed |= PointerNode->addNeighbour(*I);
+
+    return changed;
+}
+
+bool PointsToGraph::insertDerefPointee(Pointer p, Node *LocationNode)
+{
+    PointsToGraph::Node *PointerNode;
+
+    if (!LocationNode->hasNeighbours())
+        return false;
+
+    if (!(PointerNode = findNode(p)))
+        PointerNode = addNode(p);
+
+    return insertDerefPointee(PointerNode, LocationNode);
+}
+
 bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
 {
-    PointsToGraph::Node *LocationNode, *PointerNode;
+    PointsToGraph::Node *LocationNode;
     bool changed = false;
 
     LocationNode = findNode(location);
@@ -434,30 +460,25 @@ bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
         return false;
     }
 
-    if (!LocationNode->hasNeighbours())
-        return false;
+    return insertDerefPointee(p, LocationNode);
+}
 
-    if (!(PointerNode = findNode(p)))
-        PointerNode = addNode(p);
+bool PointsToGraph::insertDerefPointer(Node *PointerNode, Node *LocationNode)
+{
+    bool changed = false;
 
     std::set<PointsToGraph::Node *>::iterator I, E;
-    std::set<PointsToGraph::Node *>& Edges = LocationNode->getEdges();
+    std::set<PointsToGraph::Node *>& Edges = PointerNode->getEdges();
 
     for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
-       changed |= PointerNode->addNeighbour(*I);
+        changed |= (*I)->addNeighbour(LocationNode);
 
     return changed;
 }
 
-bool PointsToGraph::insertDerefPointer(Pointer p, Pointee location)
+bool PointsToGraph::insertDerefPointer(Node *PointerNode, Pointee location)
 {
-    PointsToGraph::Node *PointerNode, *LocationNode;
-    bool changed = false;
-
-    PointerNode = findNode(p);
-
-    if (!PointerNode)
-        return false;
+    PointsToGraph::Node *LocationNode;
 
     if (!PointerNode->hasNeighbours())
         return false;
@@ -465,11 +486,32 @@ bool PointsToGraph::insertDerefPointer(Pointer p, Pointee location)
     if (!(LocationNode = findNode(location)))
         LocationNode = addNode(location);
 
+    return insertDerefPointer(PointerNode, LocationNode);
+}
+
+
+bool PointsToGraph::insertDerefPointer(Pointer p, Pointee location)
+{
+    PointsToGraph::Node *PointerNode;
+    bool changed = false;
+
+    PointerNode = findNode(p);
+
+    if (!PointerNode)
+        return false;
+
+    return insertDerefPointer(PointerNode, location);
+}
+
+bool PointsToGraph::insertDerefBoth(Node *PointerNode, Node *LocationNode)
+{
+    bool changed = false;
+
     std::set<PointsToGraph::Node *>::iterator I, E;
     std::set<PointsToGraph::Node *>& Edges = PointerNode->getEdges();
 
     for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
-        changed |= (*I)->addNeighbour(LocationNode);
+        changed |= insertDerefPointee(*I, LocationNode);
 
     return changed;
 }
