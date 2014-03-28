@@ -214,24 +214,6 @@ PointsToGraph::~PointsToGraph()
     delete PTC;
 }
 
-bool FixedCategories::areInSameCategory(PointsToGraph::Pointer a,
-                                        PointsToGraph::Pointer b) const
-{
-    std::set<std::set<PointsToGraph::Pointer> >::const_iterator I, E;
-
-    for (I = Categories.cbegin(), E = Categories.cend(); I != E; ++I) {
-        if (I->count(a)) {
-            if (I->count(b))
-                return true;
-            else
-                return false;
-        }
-    }
-
-    assert(0 && "Haven't found pointer a");
-}
-
-
 static void printPtrName(const PointsToGraph::Pointee p)
 {
     const llvm::LoadInst *LInst;

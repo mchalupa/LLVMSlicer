@@ -123,20 +123,6 @@ namespace ptr {
         }
     };
 
-    // for testing, too unefficent for real use
-    class FixedCategories : public PointsToCategories
-    {
-    public:
-        FixedCategories(const std::set<std::set<Pointer> >& Categories)
-        {
-            this->Categories = Categories;
-        }
-
-        virtual bool areInSameCategory(Pointer a, Pointer b) const;
-    private:
-        std::set<std::set<Pointer> > Categories;
-    };
-
     class PointsToGraph
     {
     public:

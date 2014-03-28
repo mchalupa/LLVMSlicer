@@ -49,6 +49,20 @@ private:
     PointsToGraph *PTG;
 };
 
+class FixedCategories : public PointsToCategories
+{
+public:
+    FixedCategories(const std::set<std::set<Pointer> >& Categories)
+    {
+        this->Categories = Categories;
+    }
+
+    virtual bool areInSameCategory(Pointer a, Pointer b) const;
+private:
+    std::set<std::set<Pointer> > Categories;
+};
+
+
 } // namespace ptr
 } // namespace llvm
 
