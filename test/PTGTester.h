@@ -45,6 +45,82 @@ public:
     bool insertDerefBoth(Node *PointerNode, Node *LocationNode);
     */
 
+    // --------------------------------------------------------------------
+    // applyRules functions -> convert ruleCodes into points-to-graph
+    // copied from PointsTo.h
+    // --------------------------------------------------------------------
+    bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                   VARIABLE<const llvm::Value *> > const& E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(const llvm::DataLayout &DL, ASSIGNMENT<
+                   VARIABLE<const llvm::Value *>,
+                   GEP<VARIABLE<const llvm::Value *> > > const& E)
+    {
+        PTG->applyRule(DL, E);
+    }
+
+    bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                   REFERENCE<VARIABLE<const llvm::Value *> > > const& E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                   DEREFERENCE< VARIABLE<const llvm::Value *> >
+                   > const& E, const int idx = -1)
+    {
+        PTG->applyRule(E, idx);
+    }
+
+    bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                   VARIABLE<const llvm::Value *> > const& E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                   REFERENCE<VARIABLE<const llvm::Value *> > > const &E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                   DEREFERENCE<VARIABLE<const llvm::Value *> > > const& E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                   ALLOC<const llvm::Value *> > const &E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<VARIABLE<const llvm::Value *>,
+                   NULLPTR<const llvm::Value *> > const &E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(ASSIGNMENT<DEREFERENCE<VARIABLE<const llvm::Value *> >,
+                   NULLPTR<const llvm::Value *> > const &E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRule(DEALLOC<const llvm::Value *> &E)
+    {
+        PTG->applyRule(E);
+    }
+
+    bool applyRules(const RuleCode &RC, const llvm::DataLayout &DL)
+    {
+        PTG->applyRules(RC, DL);
+    }
+
 private:
     PointsToGraph *PTG;
 };
