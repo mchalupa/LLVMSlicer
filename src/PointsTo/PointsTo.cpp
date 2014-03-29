@@ -748,18 +748,20 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     bool change = false;
 
     Node *l = findNode(Ptr(lval, -1));
-
     if (!l)
         return false;
 
-    std::set<Pointer>::const_iterator I2, E2;
+    Node *r = findNode(Ptr(rval, -1));
+    if (!r)
+        return false;
+
     std::set<Node *>::const_iterator II, EE;
-    std::set<Node *>& Edges = l->getEdges();
+    // copy current edges, because we can change these edges, but
+    // we want to work only with these edges
+    // XXX don't we need copying even when dereferencing only one side??
+    std::set<Node *> Edges = r->getEdges();
     for (II = Edges.cbegin(), EE = Edges.cend(); II != EE; ++II)
-        for (I2 = (*II)->getElements().cbegin(), E2 = (*II)->getElements().cend();
-             I2 != E2; ++I2)
-            change != applyRule((ruleVar(I2->first) = *ruleVar(rval)).getSort(),
-                            I2->second /* offset */);
+        change |= insertDerefBoth(l, *II);
 
     return change;
 }
