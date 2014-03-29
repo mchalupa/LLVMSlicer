@@ -260,9 +260,9 @@ static bool derefPointeer1(PTGTester& PTG)
     addPointsTo(M, PTG, "a", "c");
     addPointsTo(M, PTG, "c", "a");
     addPointsTo(M, PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "c", DEREF_POINTER); // POINTER !!
     addPointsTo(M, PTG, "a", "c", DEREF_POINTER);
-    addPointsTo(M, PTG, "a", "c", DEREF_POINTER);
-    addPointsTo(M, PTG, "a", "c", DEREF_POINTEE);
+    addPointsTo(M, PTG, "a", "c", DEREF_POINTEE); // POINTEE !!
 
     addPointsTo(M, PTSets, "a", "b");
     addPointsTo(M, PTSets, "a", "c");
@@ -276,6 +276,54 @@ static bool derefPointeer1(PTGTester& PTG)
     if (!check(PTG, PTSets))
         errs() << "dump for " << __func__ << "\n";
 }
+
+static bool derefBoth1(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "a");
+    addPointsTo(M, PTG, "c", "d");
+    addPointsTo(M, PTG, "a", "c", DEREF_BOTH);
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "a");
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "b", "a");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "a");
+    addPointsTo(M, PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
+static bool derefBoth2(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "b", "b");
+    addPointsTo(M, PTG, "b", "d");
+    addPointsTo(M, PTG, "d", "e");
+    addPointsTo(M, PTG, "a", "b", DEREF_BOTH);
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "b");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "d", "e");
+
+    addPointsTo(M, PTSets, "c", "b");
+    addPointsTo(M, PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
 
 static std::set<std::set<Pointer> > categories1(void)
 {
@@ -635,7 +683,194 @@ static bool applyDrefVarAsgnVar(PTGTester& PTG)
         errs() << "dump for 4rd in " << __func__ << "\n";
 }
 
+static bool applyDrefVarAsgnRef(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
 
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "g");
+    addPointsTo(M, PTG, "c", "e");
+    addPointsTo(M, PTG, "e", "d");
+    addPointsTo(M, PTG, "e", "f");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "e").first;
+    PTG.applyRule((*ruleVar(lval) = &ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "g");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "e", "d");
+    addPointsTo(M, PTSets, "e", "f");
+
+    addPointsTo(M, PTSets, "c", "e", -1, 0);
+    addPointsTo(M, PTSets, "g", "e", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    rval = lval; // lval = @a;
+    lval = getPointer(M, "c").first;
+    PTG.applyRule((*ruleVar(lval) = &ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "e", "a", -1, 0);
+    addPointsTo(M, PTSets, "e", "a", 0, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    // should not change graph
+    lval = getPointer(M, "f").first;
+    rval = getPointer(M, "d").first;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+static bool applyVarAsgnNull(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "null").first;
+    // have to add null value into getPointer
+    PTG.applyRule((ruleVar(lval) = ruleNull(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "d", "null", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    lval = getPointer(M, "e").first;
+    PTG.applyRule((ruleVar(lval) = ruleNull(rval)).getSort());
+
+    addPointsTo(M, PTSets, "e", "null", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    PTG.applyRule((ruleVar(lval) = ruleNull(rval)).getSort());
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+static bool applyDrefVarAsgnNull(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "a", "g");
+    addPointsTo(M, PTG, "c", "e");
+    addPointsTo(M, PTG, "e", "d");
+    addPointsTo(M, PTG, "e", "f");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "null").first;
+    PTG.applyRule((*ruleVar(lval) = &ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "a", "g");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "e", "d");
+    addPointsTo(M, PTSets, "e", "f");
+
+    addPointsTo(M, PTSets, "c", "null", -1, 0);
+    addPointsTo(M, PTSets, "g", "null", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    // should not change graph
+    lval = getPointer(M, "f").first;
+    rval = getPointer(M, "null").first;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+}
+
+static bool applyDrefVarAsgnDref(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "b", "c");
+    addPointsTo(M, PTG, "c", "e");
+    addPointsTo(M, PTG, "c", "g");
+    addPointsTo(M, PTG, "e", "d");
+    addPointsTo(M, PTG, "e", "f");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "b").first;
+    PTG.applyRule((*ruleVar(lval) = *ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "c", "g");
+    addPointsTo(M, PTSets, "e", "d");
+    addPointsTo(M, PTSets, "e", "f");
+
+    addPointsTo(M, PTSets, "b", "e");
+    addPointsTo(M, PTSets, "b", "g");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    PTG.applyRule((*ruleVar(lval) = *ruleVar(rval)).getSort());
+    addPointsTo(M, PTSets, "b", "f");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "c", "f");
+    addPointsTo(M, PTSets, "c", "d");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+}
+
+static bool applyDrefVarAsgnDref2(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "b", "b");
+    addPointsTo(M, PTG, "b", "d");
+    addPointsTo(M, PTG, "d", "e");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "b").first;
+    PTG.applyRule((*ruleVar(lval) = *ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "b", "b");
+    addPointsTo(M, PTSets, "b", "d");
+    addPointsTo(M, PTSets, "d", "e");
+
+    addPointsTo(M, PTSets, "b", "e");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "c", "b");
+    addPointsTo(M, PTSets, "c", "d");
+
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
 
 int main(int argc, char **argv)
 {
@@ -664,6 +899,8 @@ int main(int argc, char **argv)
     buildPointsToGraph(derefPointee2);
     buildPointsToGraph(derefPointee3);
     buildPointsToGraph(derefPointeer1);
+    buildPointsToGraph(derefBoth1);
+    buildPointsToGraph(derefBoth2);
 
     // tests with fixed categories, the first three ones are also from the
     // Shapiro-Horwitz paper (Figure 3)
@@ -679,12 +916,13 @@ int main(int argc, char **argv)
     buildPointsToGraph(applyVarAsgnVar);
     buildPointsToGraph(applyVarAsgnDeref);
     buildPointsToGraph(applyDrefVarAsgnVar);
+    buildPointsToGraph(applyDrefVarAsgnRef);
+    buildPointsToGraph(applyVarAsgnNull);
+    buildPointsToGraph(applyDrefVarAsgnNull);
+    buildPointsToGraph(applyDrefVarAsgnDref);
+    buildPointsToGraph(applyDrefVarAsgnDref2);
 
     notTested("var asgn gep");
-    notTested("deref var asgn ref");
-    notTested("deref asgn deref");
-    notTested("var asgn null");
-    notTested("deref var asgn null");
 
     std::pair<int, int>results = getResults();
 
