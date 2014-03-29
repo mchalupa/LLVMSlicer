@@ -422,6 +422,220 @@ static bool fixedCateg4(PTGTester& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
+static bool applyVarAsgnAlloc(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "a").first;
+    PTG.applyRule((ruleVar(lval) = ruleAllocSite(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    // alloc should have offset 0
+    addPointsTo(M, PTSets, "d", "a", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "c").first;
+    PTG.applyRule((ruleVar(lval) = ruleAllocSite(rval)).getSort());
+
+    addPointsTo(M, PTSets, "d", "c", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    PTG.applyRule((ruleVar(lval) = ruleAllocSite(rval)).getSort());
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+static bool applyVarAsgnRef(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "a").first;
+    PTG.applyRule((ruleVar(lval) = &ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "d", "a", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "c").first;
+    PTG.applyRule((ruleVar(lval) = &ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "d", "c", -1, 0);
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    PTG.applyRule((ruleVar(lval) = ruleAllocSite(rval)).getSort());
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+
+static bool applyVarAsgnVar(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "b");
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+
+    lval = getPointer(M, "d").first;
+    rval = getPointer(M, "a").first;
+    PTG.applyRule((ruleVar(lval) = ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "b");
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "d", "b");
+    addPointsTo(M, PTSets, "d", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    // this should not change the sets
+    rval = getPointer(M, "d").first;
+    PTG.applyRule((ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    // this should also not change the sets, since e
+    // has no points-to set
+    lval = getPointer(M, "e").first;
+    rval = lval;
+    PTG.applyRule((ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+static bool applyVarAsgnDeref(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+    addPointsTo(M, PTG, "e", "d");
+    addPointsTo(M, PTG, "e", "f");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "c").first;
+    PTG.applyRule((ruleVar(lval) = *ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "e", "d");
+    addPointsTo(M, PTSets, "e", "f");
+
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "a", "f");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    // this should not change the sets
+    // lval = "a"
+    PTG.applyRule((ruleVar(lval) = *ruleVar(lval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "e");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    lval = getPointer(M, "e").first;
+    rval = lval;
+    PTG.applyRule((ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+}
+
+static bool applyDrefVarAsgnVar(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+    const llvm::Value *lval, *rval;
+
+    addPointsTo(M, PTG, "a", "c");
+    addPointsTo(M, PTG, "c", "e");
+    addPointsTo(M, PTG, "e", "d");
+    addPointsTo(M, PTG, "e", "f");
+
+    lval = getPointer(M, "a").first;
+    rval = getPointer(M, "e").first;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "a", "c");
+    addPointsTo(M, PTSets, "c", "e");
+    addPointsTo(M, PTSets, "e", "d");
+    addPointsTo(M, PTSets, "e", "f");
+
+    addPointsTo(M, PTSets, "c", "d");
+    addPointsTo(M, PTSets, "c", "f");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 1st in " << __func__ << "\n";
+
+    addPointsTo(M, PTG, "c", "a");
+    addPointsTo(M, PTSets, "c", "a");
+
+    rval = lval; // *a = a;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+
+    addPointsTo(M, PTSets, "c", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 2nd in " << __func__ << "\n";
+
+    lval = getPointer(M, "c").first;
+    rval = getPointer(M, "d").first;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 3rd in " << __func__ << "\n";
+
+    addPointsTo(M, PTG, "d", "e");
+    addPointsTo(M, PTSets, "d", "e");
+
+    // *c = e
+    rval = getPointer(M, "e").first;
+    PTG.applyRule((*ruleVar(lval) = ruleVar(rval)).getSort());
+    addPointsTo(M, PTSets, "d", "f");
+    addPointsTo(M, PTSets, "d", "d");
+    addPointsTo(M, PTSets, "f", "f");
+    addPointsTo(M, PTSets, "f", "d");
+    addPointsTo(M, PTSets, "a", "d");
+    addPointsTo(M, PTSets, "a", "f");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for 4rd in " << __func__ << "\n";
+}
+
+
 
 int main(int argc, char **argv)
 {
@@ -458,10 +672,26 @@ int main(int argc, char **argv)
     buildPointsToGraph(fixedCateg3, new ptr::FixedCategories(categories3()));
     buildPointsToGraph(fixedCateg4, new ptr::FixedCategories(categories4()));
 
+    // tests for applyRule's functions
+    // use andersen-like categories
+    buildPointsToGraph(applyVarAsgnAlloc);
+    buildPointsToGraph(applyVarAsgnRef);
+    buildPointsToGraph(applyVarAsgnVar);
+    buildPointsToGraph(applyVarAsgnDeref);
+    buildPointsToGraph(applyDrefVarAsgnVar);
+
+    notTested("var asgn gep");
+    notTested("deref var asgn ref");
+    notTested("deref asgn deref");
+    notTested("var asgn null");
+    notTested("deref var asgn null");
+
     std::pair<int, int>results = getResults();
 
     if (results.first)
         errs() << results.first << " tests from " << results.second << " failed!\n";
+    else
+        errs() << "All tests passed!\n";
 
 	return results.first != 0;
 }
