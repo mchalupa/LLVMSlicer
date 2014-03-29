@@ -4,11 +4,13 @@ using namespace llvm;
 
 typedef PointsToGraph::Pointer Pointer;
 typedef PointsToGraph::Pointer Pointee;
+typedef std::pair<const char *, int64_t > TestPointer;
 
 static int failed = 0;
 static int total = 0;
 
-static std::map<const char *, Pointer> valueMap;
+static std::map<TestPointer, Pointer> valueMap;
+static std::map<const char *, Value *> llvmValues;
 
 void dumpPointsToSets(ptr::PointsToSets& PS)
 {
@@ -17,10 +19,14 @@ void dumpPointsToSets(ptr::PointsToSets& PS)
 
     for (I = PS.begin(), E = PS.end(); I != E; ++I) {
         errs() << "PTR: ";
+        if (I->first.second >= 0)
+            errs() << "+" << I->first.second << " ";
         I->first.first->dump();
 
         for (II = I->second.cbegin(), EE = I->second.cend(); II != EE; ++II) {
             errs() << "    --> ";
+            if (II->second >= 0)
+                errs() << "+" << II->second << " ";
             II->first->dump();
         }
     }
@@ -50,23 +56,32 @@ bool comparePointsToSets(ptr::PointsToSets& a, ptr::PointsToSets& b)
             if (*PI1 != *PI2)
                 return false;
         }
-
     }
 
     return true;
 }
 
 // get or create value
-Pointer getPointer(Module *M, const char *name)
+Pointer getPointer(Module *M, const char *name, int64_t off)
 {
-    std::map<const char *, Pointer>::iterator I = valueMap.find(name);
-
+    Value *va;
+    std::map<TestPointer, Pointer>::iterator I
+                                        = valueMap.find(TestPointer(name, off));
     if (I == valueMap.end()) {
-        Value *va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
-                                         false,
-                                         GlobalValue::CommonLinkage, 0 , name);
-        Pointer p(va, -1);
-        valueMap.insert(std::make_pair(name, p));
+        // use always the same llvm value
+        std::map<const char *, Value *>::iterator VI = llvmValues.find(name);
+        if (VI == llvmValues.end()) {
+            va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
+                                    false,
+                                    GlobalValue::CommonLinkage, 0 , name);
+            llvmValues.insert(std::make_pair(name, va));
+        } else {
+            va = VI->second;
+        }
+
+        TestPointer tp(name, off);
+        Pointer p(va, off);
+        valueMap.insert(std::make_pair(tp, p));
 
         return p;
     }
@@ -76,12 +91,13 @@ Pointer getPointer(Module *M, const char *name)
 
 void addPointsTo(Module *M, PTGTester &PTG,
                  const char *a, const char *b,
-                 enum deref derefFlag)
+                 enum deref derefFlag,
+                 int64_t aoff, int64_t boff)
 {
     Pointer pa, pb;
 
-    pa = getPointer(M, a);
-    pb = getPointer(M, b);
+    pa = getPointer(M, a, aoff);
+    pb = getPointer(M, b, boff);
 
     switch (derefFlag) {
     case DEREF_NONE:
@@ -96,10 +112,11 @@ void addPointsTo(Module *M, PTGTester &PTG,
 }
 
 void addPointsTo(Module *M, ptr::PointsToSets& PTSets,
-                 const char *a, const char *b)
+                 const char *a, const char *b,
+                 int64_t aoff, int64_t boff)
 {
-    Pointer p = getPointer(M, a);
-    Pointee l = getPointer(M, b);
+    Pointer p = getPointer(M, a, aoff);
+    Pointee l = getPointer(M, b, boff);
 
     ptr::PointsToSets::PointsToSet& S = PTSets[p];
     S.insert(l);

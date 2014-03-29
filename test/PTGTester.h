@@ -153,7 +153,7 @@ bool comparePointsToSets(PointsToSets& a, PointsToSets& b);
 // get pointer with given name. All such pointers are globals
 // and should be used for testing PTG insert logic only.
 // For other testing must be used working Module with real Values
-PointsToGraph::Pointer getPointer(llvm::Module *M, const char *name);
+PointsToGraph::Pointer getPointer(llvm::Module *M, const char *name, int64_t off = -1);
 
 enum deref {
     DEREF_NONE,
@@ -164,11 +164,13 @@ enum deref {
 // insert new points-to pair into PTG
 void addPointsTo(llvm::Module *M, PTGTester &PTG,
                  const char *a, const char *b,
-                 enum deref derefFlag = DEREF_NONE);
+                 enum deref derefFlag = DEREF_NONE,
+                 int64_t aoff = -1, int64_t boff = -1);
 
 // add points-to pair to control points-to set
 void addPointsTo(llvm::Module *M, PointsToSets& PTSets,
-                 const char *a, const char *b);
+                 const char *a, const char *b,
+                 int64_t aoff = -1, int64_t boff = -1);
 
 bool check(PTGTester &PTG, PointsToSets &S);
 
