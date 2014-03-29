@@ -174,4 +174,6 @@ void addPointsTo(llvm::Module *M, PointsToSets& PTSets,
 
 bool check(PTGTester &PTG, PointsToSets &S);
 
+void notTested(const char *msg);
+
 std::pair<int, int> getResults(void);

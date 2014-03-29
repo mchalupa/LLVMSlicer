@@ -152,6 +152,13 @@ std::pair<int, int> getResults(void)
     return std::pair<int, int>(failed, total);
 }
 
+void notTested(const char *msg)
+{
+    errs() << "NOT TESTED: "<< msg << "\n";
+    ++total;
+    ++failed;
+}
+
 namespace llvm {
 namespace ptr {
 
