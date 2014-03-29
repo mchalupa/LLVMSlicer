@@ -65,15 +65,20 @@ bool comparePointsToSets(ptr::PointsToSets& a, ptr::PointsToSets& b)
 Pointer getPointer(Module *M, const char *name, int64_t off)
 {
     Value *va;
+
+
     std::map<TestPointer, Pointer>::iterator I
                                         = valueMap.find(TestPointer(name, off));
     if (I == valueMap.end()) {
         // use always the same llvm value
         std::map<const char *, Value *>::iterator VI = llvmValues.find(name);
         if (VI == llvmValues.end()) {
-            va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
-                                    false,
-                                    GlobalValue::CommonLinkage, 0 , name);
+            if (strcmp(name, "null") == 0)
+                va = ConstantPointerNull::get(llvm::Type::getInt32PtrTy(M->getContext()));
+            else
+                va = new GlobalVariable(*M, IntegerType::get(M->getContext(), 32),
+                                        false,
+                                        GlobalValue::CommonLinkage, 0 , name);
             llvmValues.insert(std::make_pair(name, va));
         } else {
             va = VI->second;
