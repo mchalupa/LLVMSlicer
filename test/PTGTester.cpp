@@ -111,6 +111,8 @@ void addPointsTo(Module *M, PTGTester &PTG,
         PTG.insertDerefPointee(pa, pb); break;
     case DEREF_POINTER:
         PTG.insertDerefPointer(pa, pb); break;
+    case DEREF_BOTH:
+        PTG.insertDerefBoth(pa, pb); break;
     default:
         assert(0);
     }

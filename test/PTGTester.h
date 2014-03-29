@@ -37,12 +37,23 @@ public:
         return PTG->insertDerefPointer(p, location);
     }
 
+    bool insertDerefBoth(Pointer p, Pointee location)
+    {
+        PointsToGraph::Node *l, *r;
+
+        if (!(l = PTG->findNode(p)))
+            return false;
+        if (!(r = PTG->findNode(location)))
+            return false;
+
+        return PTG->insertDerefBoth(l, r);
+    }
+
     /*
     bool insertDerefPointee(Pointer p, Node *LocationNode);
     bool insertDerefPointee(Node *PointerNode, Node *LocationNode);
     bool insertDerefPointer(Node *PointerNode, Pointee location);
     bool insertDerefPointer(Node *PointerNode, Node *LocationNode);
-    bool insertDerefBoth(Node *PointerNode, Node *LocationNode);
     */
 
     // --------------------------------------------------------------------
@@ -158,7 +169,8 @@ PointsToGraph::Pointer getPointer(llvm::Module *M, const char *name, int64_t off
 enum deref {
     DEREF_NONE,
     DEREF_POINTEE,
-    DEREF_POINTER
+    DEREF_POINTER,
+    DEREF_BOTH
 };
 
 // insert new points-to pair into PTG
