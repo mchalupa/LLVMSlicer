@@ -190,7 +190,8 @@ namespace ptr {
                 return !Edges.empty();
             }
 
-            void convertToPointsToSets(PointsToSets& PS) const;
+            void convertToPointsToSets(PointsToSets& PS,
+                                       bool intersect = false) const;
 
             void dump(void) const;
 

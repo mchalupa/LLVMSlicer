@@ -498,17 +498,8 @@ bool PointsToGraph::insertDerefBoth(Node *PointerNode, Node *LocationNode)
     return changed;
 }
 
-// add elements from node to PTSet of a pointer
-static void addToPTSet(const std::set<PointsToGraph::Pointee>& S,
-                        PointsToSets::PointsToSet& PS)
-{
-    std::set<PointsToGraph::Pointee>::const_iterator I, E;
-
-    for (I = S.cbegin(), E = S.cend(); I != E; ++I)
-        PS.insert(*I);
-}
-
-void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS) const
+void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
+                                                bool intersect) const
 {
     typedef PointsToSets::PointsToSet PTSet;
     typedef PointsToSets::Pointer Ptr;
@@ -520,10 +511,34 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS) const
             ElemI != ElemE; ++ElemI) {
 
         PTSet& S = PS[*ElemI];
+        PTSet TmpPTSet;
 
         for (EdgesI = Edges.cbegin(), EdgesE = Edges.cend();
-                EdgesI != EdgesE; ++EdgesI) {
-            addToPTSet((*EdgesI)->getElements(), S);
+             EdgesI != EdgesE; ++EdgesI) {
+            const PTSet& Ptees = (*EdgesI)->getElements();
+
+            if (intersect) {
+                // when creating intersection, add the intersection into
+                // TmpPTSet (if there are more outgoing edges from a node,
+                // then I need to accumulate intersections from all these nodes
+                std::set_intersection(S.begin(), S.end(),
+                                      Ptees.begin(), Ptees.end(),
+                                      std::inserter(TmpPTSet, TmpPTSet.end()));
+
+            } else {
+                std::copy(Ptees.begin(), Ptees.end(),
+                          std::inserter(S, S.end()));
+            }
+        }
+
+        if (intersect) {
+            // store accumulated intersection in original pt set
+            S.swap(TmpPTSet);
+
+            // clean empty nodes. Empty nodes can be created only by
+            // intersection
+            if (S.empty())
+                PS.getContainer().erase(PS.find(*ElemI));
         }
     }
 }
@@ -531,10 +546,11 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS) const
 PointsToSets& PointsToGraph::toPointsToSets(PointsToSets& PS) const
 {
     std::set<Node *>::const_iterator I, E;
+    bool intersect = !PS.getContainer().empty();
 
     for (I = Nodes.cbegin(), E = Nodes.cend(); I != E; ++I)
         if ((*I)->hasNeighbours())
-            (*I)->convertToPointsToSets(PS);
+            (*I)->convertToPointsToSets(PS, intersect);
 
     return PS;
 }
