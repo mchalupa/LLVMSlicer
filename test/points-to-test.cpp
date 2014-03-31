@@ -872,6 +872,64 @@ static bool applyDrefVarAsgnDref2(PTGTester& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
+static void idBitsCateg(void)
+{
+    Pointer a = getPointer(M, "a");
+    Pointer b = getPointer(M, "b");
+    unsigned int AID = a.first->getValueID();
+    unsigned int BID = b.first->getValueID();
+
+    PointsToCategories *categ = new IDBitsCategory(0); // compare LSB
+    assert(categ->areInSameCategory(a, a));
+    assert(categ->areInSameCategory(b, b));
+
+    if ((AID & 0x1) == (BID & 0x1))
+        assert(categ->areInSameCategory(a, b));
+    else
+        assert(!categ->areInSameCategory(a, b));
+
+    AID = AID >> 1;
+    BID = BID >> 1;
+    delete categ;
+    categ = new IDBitsCategory(1);
+
+    if ((AID & 0x1) == (BID & 0x1))
+        assert(categ->areInSameCategory(a, b));
+    else
+        assert(!categ->areInSameCategory(a, b));
+
+    AID = AID >> 1;
+    BID = BID >> 1;
+    delete categ;
+    categ = new IDBitsCategory(2);
+
+    if ((AID & 0x1) == (BID & 0x1))
+        assert(categ->areInSameCategory(a, b));
+    else
+        assert(!categ->areInSameCategory(a, b));
+
+    AID = AID >> 1;
+    BID = BID >> 1;
+    delete categ;
+    categ = new IDBitsCategory(3);
+
+    if ((AID & 0x1) == (BID & 0x1))
+        assert(categ->areInSameCategory(a, b));
+    else
+        assert(!categ->areInSameCategory(a, b));
+
+
+    AID = AID >> 1;
+    BID = BID >> 1;
+    delete categ;
+    categ = new IDBitsCategory(4);
+
+    if ((AID & 0x1) == (BID & 0x1))
+        assert(categ->areInSameCategory(a, b));
+    else
+        assert(!categ->areInSameCategory(a, b));
+}
+
 int main(int argc, char **argv)
 {
 	LLVMContext context;
@@ -921,8 +979,10 @@ int main(int argc, char **argv)
     buildPointsToGraph(applyDrefVarAsgnNull);
     buildPointsToGraph(applyDrefVarAsgnDref);
     buildPointsToGraph(applyDrefVarAsgnDref2);
-
     notTested("var asgn gep");
+
+    // test categories
+    idBitsCateg();
 
     std::pair<int, int>results = getResults();
 

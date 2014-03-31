@@ -123,6 +123,21 @@ namespace ptr {
         }
     };
 
+    class IDBitsCategory : public PointsToCategories
+    {
+    public:
+        IDBitsCategory(unsigned int K) { this->K = K; }
+        virtual bool areInSameCategory(Pointer a, Pointer b) const
+        {
+            // compare Kth bits of IDs
+            return (((a.first->getValueID() >> K) & 0x1)
+                    == ((b.first->getValueID() >> K) & 0x1));
+        }
+    private:
+        // use Kth bit of ID
+        unsigned int K;
+    };
+
     class PointsToGraph
     {
     public:
