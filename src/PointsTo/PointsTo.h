@@ -288,7 +288,8 @@ namespace llvm { namespace ptr {
   getPointsToSet(const llvm::Value *const &memLoc, const PointsToSets &S,
 		  const int offset = -1);
 
-  PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S);
+  PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S,
+                                    unsigned int K = 0);
 
 }}
 

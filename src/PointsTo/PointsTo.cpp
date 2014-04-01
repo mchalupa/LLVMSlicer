@@ -925,16 +925,56 @@ const PointsToGraph& PointsToGraph::fixpoint(void)
   return *this;
 }
 
-PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S) {
-    // TODO categories
-    PointsToGraph PTG(&P, new AllInSelfCategory());
+PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S,
+                                  unsigned int K)
+{
+    PointsToSets TmpPTS;
+    unsigned int Runs, I;
 
-#ifdef PTG_DEBUG
-    errs() << "Computed this PTG:\n";
-    PTG.dump()
-#endif
+    if (K) {
+        Runs = (unsigned int) (log(K) / log(2)); // transfer to base of 2
+        if (!Runs)
+            Runs = 1;
 
-    return pruneByType(PTG.toPointsToSets(S));
+#ifdef PS_DEBUG
+        errs() << "[Points-to]: Running algorithm " << Runs << " times\n";
+#endif // PS_DEBUG
+
+        for (I = 0; I < Runs; ++I) {
+            PointsToGraph PTG(&P, new IDBitsCategory(I));
+            PTG.toPointsToSets(S);
+        }
+    // if K is not given, compute number of runs from first run
+    // XXX or use program structure?
+    } else {
+        // Steengaard's analysis is the fastest but least accurate.
+        // However, points-to sets computed by steengaard's analysis
+        // gives us upper bound. They can be now only
+        // reduced. Deduce next steps from this first run
+        PointsToGraph PTG(&P, new AllInOneCategory());
+        PTG.toPointsToSets(S);
+
+        K = S.getContainer().size();
+        // use log2(n) runs of the algorithm
+        Runs = (unsigned int) (log(K) / log(2));
+        // setting Runs to 1 here has no effect but writing out
+        // correct debug message
+        if (!Runs)
+            Runs = 1;
+
+#ifdef PS_DEBUG
+        errs() << "[Points-to]: Guessing number of runs\n";
+        errs() << "[Points-to]: Running algorithm " << Runs << " times\n";
+#endif // PS_DEBUG
+
+        // I = 1 because we have already done one run
+        for (I = 1; I < Runs; ++I) {
+            PointsToGraph PTG(&P, new IDBitsCategory(I));
+            PTG.toPointsToSets(S);
+        }
+    }
+
+    return pruneByType(S);
 }
 
 const PTSet &
