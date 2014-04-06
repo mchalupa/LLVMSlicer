@@ -184,6 +184,7 @@ void addPointsTo(llvm::Module *M, PointsToSets& PTSets,
                  const char *a, const char *b,
                  int64_t aoff = -1, int64_t boff = -1);
 
+bool check(PointsToSets &A, PointsToSets &B);
 bool check(PTGTester &PTG, PointsToSets &S);
 
 void notTested(const char *msg);

@@ -129,26 +129,36 @@ void addPointsTo(Module *M, ptr::PointsToSets& PTSets,
     S.insert(l);
 }
 
+bool check(ptr::PointsToSets &A, ptr::PointsToSets &B)
+{
+
+    ++total;
+
+    if (!comparePointsToSets(A, B)) {
+        ++failed;
+
+        errs() << "\nPoints-to sets:\n\n";
+        dumpPointsToSets(A);
+        errs() << "should be\n";
+        dumpPointsToSets(B);
+        errs() << "\n";
+
+        return false;
+    }
+
+    return true;
+}
+
+
 bool check(PTGTester &PTG, ptr::PointsToSets &S)
 {
     ptr::PointsToSets PTGSet;
 
     PTG.getPTG().toPointsToSets(PTGSet);
 
-    ++total;
-
-    if (!comparePointsToSets(S, PTGSet)) {
-        ++failed;
-
-        errs() << "Points-to graph:\n\n";
+    if (!check(PTGSet, S)) {
+        errs() << "PTG:\n";
         PTG.getPTG().dump();
-        errs() << "\nAssocaited points-to set:\n\n";
-        dumpPointsToSets(PTGSet);
-        errs() << "But should be\n";
-        dumpPointsToSets(S);
-        errs() << "\n";
-
-        return false;
     }
 
     return true;

@@ -930,6 +930,79 @@ static void idBitsCateg(void)
         assert(!categ->areInSameCategory(a, b));
 }
 
+static void toPointsToSets1(void)
+{
+    ptr::PointsToGraph PTG(PS, new ptr::AllInSelfCategory);
+    ptr::PointsToSets A, B;
+
+    PTGTester T(&PTG);
+
+    // initialize graph with pts-to pairs
+    addPointsTo(M, T, "a", "b");
+    addPointsTo(M, T, "a", "c");
+    addPointsTo(M, T, "b", "c");
+    addPointsTo(M, T, "d", "d");
+    addPointsTo(M, T, "e", "g");
+
+    addPointsTo(M, A, "a", "b");
+    addPointsTo(M, A, "a", "c");
+    addPointsTo(M, A, "b", "c");
+    addPointsTo(M, A, "d", "d");
+    addPointsTo(M, A, "e", "g");
+
+    if (!check(T, A))
+        errs() << "prolly bug in addPointsTo or PTG.insert ...: "
+               << __func__ << "\n";
+
+    // build new pts-to sets
+    PTG.toPointsToSets(B);
+
+    if (!check(B, A))
+        errs() << "pts-to sets should equal (new): " << __func__ << "\n";
+
+    for (int I = 0; I < 10; ++I) {
+        // create intersection with itself.. should do nothing
+        PTG.toPointsToSets(B);
+
+        if (!check(B, A))
+            errs() << "pts-to sets should equal (inters. " << I + 1
+                   << "): " << __func__ << "\n";
+    }
+}
+
+static void toPointsToSets2(void)
+{
+    ptr::PointsToGraph PTG(PS, new ptr::AllInSelfCategory);
+    ptr::PointsToSets A, B, C;
+
+    PTGTester T(&PTG);
+
+    // initialize graph with pts-to pairs
+    addPointsTo(M, T, "a", "b");
+    addPointsTo(M, T, "a", "c");
+    addPointsTo(M, T, "b", "c");
+    addPointsTo(M, T, "d", "d");
+    addPointsTo(M, T, "e", "g");
+
+    // build new pts-to sets
+    PTG.toPointsToSets(B);
+
+    addPointsTo(M, A, "a", "b");
+    addPointsTo(M, A, "b", "c");
+    addPointsTo(M, A, "a", "g");
+    addPointsTo(M, A, "d", "e");
+    addPointsTo(M, A, "e", "c");
+
+    addPointsTo(M, C, "a", "b");
+    addPointsTo(M, C, "b", "c");
+
+    // create intersection of PTG with A. C should be a result
+    PTG.toPointsToSets(A);
+
+    if (!check(A, C))
+        errs() << "pts-to sets: " << __func__ << "\n";
+}
+
 int main(int argc, char **argv)
 {
 	LLVMContext context;
@@ -983,6 +1056,10 @@ int main(int argc, char **argv)
 
     // test categories
     idBitsCateg();
+
+    // test computePointsToSets
+    toPointsToSets1();
+    toPointsToSets2();
 
     std::pair<int, int>results = getResults();
 
