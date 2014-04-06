@@ -928,6 +928,8 @@ static void idBitsCateg(void)
         assert(categ->areInSameCategory(a, b));
     else
         assert(!categ->areInSameCategory(a, b));
+
+    delete categ;
 }
 
 static void toPointsToSets1(void)
