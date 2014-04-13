@@ -5,6 +5,7 @@
 #define POINTSTO_POINTSTO_H
 
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <vector>
 
@@ -90,6 +91,22 @@ namespace llvm { namespace ptr {
 
 }}
 
+namespace std {
+
+typedef pair<const llvm::Value *, int> Ptr;
+
+template<>
+struct hash<Ptr> {
+    size_t operator()(const Ptr& val) const
+    {
+        return (_hash(val.first) ^ val.second);
+    }
+
+    hash<const llvm::Value *> _hash;
+};
+
+} // namespace std
+
 namespace llvm {
 namespace ptr {
 
@@ -145,6 +162,8 @@ namespace ptr {
         PointsToGraph(const ProgramStructure *PS, PointsToCategories *PTC)
         :PS(PS), PTC(PTC)
         {
+            // estimate number of pointers
+            Nodes.reserve(3 * PS->getContainer().size() / 2);
             fixpoint();
         }
 
@@ -223,12 +242,15 @@ namespace ptr {
         // or NULL
         Node *shouldAddTo(Node *root, Pointee p);
 
-        // find node which contains pointer/pointee p
-        Node *findNode(Pointee p) const;
-
         Node *addNode(Pointee p);
 
-        std::set<Node *> Nodes;
+        Node *findNode(Pointee p) const;
+
+        // replace node in map
+        void replaceNode(Node *, Node *);
+
+        // hash table Pointer->Node
+        std::unordered_map<Pointer, Node *> Nodes;
         const ProgramStructure *PS;
         PointsToCategories *PTC;
 

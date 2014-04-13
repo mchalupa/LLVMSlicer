@@ -2,6 +2,7 @@
 // License. See LICENSE.TXT for details.
 
 #include <map>
+#include <unordered_map>
 
 #include "llvm/BasicBlock.h"
 #include "llvm/DataLayout.h"
@@ -204,10 +205,14 @@ namespace ptr {
 
 PointsToGraph::~PointsToGraph()
 {
-    std::set<Node *>::iterator I, E;
+    std::unordered_map<Pointer, Node *>::iterator I, E;
 
-    for (I = Nodes.begin(), E = Nodes.end(); I != E; ++I)
-        delete *I;
+    for (I = Nodes.begin(), E = Nodes.end(); I != E; ++I) {
+        if (I->second) {
+            replaceNode(I->second, NULL);
+            delete I->second;
+        }
+    }
 
     // PointsToGraph adopts the category, since it must be
     // allocated on heap because of virtual functions
@@ -264,7 +269,7 @@ void PointsToGraph::Node::dump(void) const
 
 void PointsToGraph::dump(void) const
 {
-    std::set<PointsToGraph::Node *>::const_iterator I, E;
+    std::unordered_map<Pointer, Node *>::const_iterator I, E;
     std::set<PointsToGraph::Node *>::const_iterator II, EE;
 
     if (Nodes.empty()) {
@@ -273,9 +278,13 @@ void PointsToGraph::dump(void) const
     }
 
     for(I = Nodes.begin(), E = Nodes.end(); I != E; ++I) {
-        (*I)->dump();
+        if (!I->second)
+            continue;
 
-        for (II = (*I)->getEdges().begin(), EE = (*I)->getEdges().end();
+        I->second->dump();
+
+        for (II = (I->second)->getEdges().begin(),
+             EE = (I->second)->getEdges().end();
                 II != EE; ++II) {
             errs() << "    --> ";
             (*II)->dump();
@@ -283,15 +292,41 @@ void PointsToGraph::dump(void) const
     }
 }
 
-PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
+void PointsToGraph::replaceNode(PointsToGraph::Node *a,
+                                PointsToGraph::Node *b)
 {
-    std::set<Node *>::const_iterator I, E;
+    std::set<Pointee>::iterator I, E;
+    std::set<Pointee>& Elements = a->getElements();
 
-    for (I = Nodes.cbegin(), E = Nodes.cend(); I != E; ++I)
-        if ((*I)->contains(p))
-            return *I;
+    // we must zero out all occurences in the map
+    for (I = Elements.begin(), E = Elements.end(); I != E; ++I) {
+        Node *&n = Nodes[*I];
+        /*
+        if (n != a) {
+            errs() << "Pointer ";
+            printPtrName(*I);
+            errs() << " has set wrong node. Should be ";
+            a->dump();
+            errs() << "but is ";
+            if (n)
+                n->dump();
+            else
+                errs() << "NULL\n";
+        }
+        */
+        n = b;
+    }
+}
 
-    return NULL;
+inline PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
+{
+    std::unordered_map<Pointer, Node *>::const_iterator I;
+    I = Nodes.find(p);
+
+    if (I == Nodes.end())
+        return NULL;
+    else
+        return I->second;
 }
 
 // take nodes outgoing from root and check if pointee p
@@ -315,7 +350,7 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
 PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
 {
     PointsToGraph::Node *n = new PointsToGraph::Node(p);
-    Nodes.insert(n);
+    Nodes.insert(make_pair(p, n));
 
 #ifdef PTG_DEBUG
     errs() << "CREATE new node for "; p.first->dump();
@@ -359,6 +394,7 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 #endif
 
         changed = To->insert(location);
+        Nodes[location] = To;
     } else if ((To = findNode(location))) {
         ///
         // if the location is already in some node, use this node
@@ -545,12 +581,12 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
 
 PointsToSets& PointsToGraph::toPointsToSets(PointsToSets& PS) const
 {
-    std::set<Node *>::const_iterator I, E;
+    std::unordered_map<Pointer, Node *>::const_iterator I, E;
     bool intersect = !PS.getContainer().empty();
 
     for (I = Nodes.cbegin(), E = Nodes.cend(); I != E; ++I)
-        if ((*I)->hasNeighbours())
-            (*I)->convertToPointsToSets(PS, intersect);
+        if (I->second && (I->second)->hasNeighbours())
+            (I->second)->convertToPointsToSets(PS, intersect);
 
     return PS;
 }
