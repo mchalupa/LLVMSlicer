@@ -242,7 +242,11 @@ namespace ptr {
         // or NULL
         Node *shouldAddTo(Node *root, Pointee p);
 
+        // add new node
         Node *addNode(Pointee p);
+
+        // get or insert new node, accesses Nodes only once
+        Node *getNode(Pointee P);
 
         Node *findNode(Pointee p) const;
 

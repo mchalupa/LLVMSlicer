@@ -347,14 +347,25 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
     return NULL;
 }
 
-PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
+inline PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
 {
     PointsToGraph::Node *n = new PointsToGraph::Node(p);
-    Nodes.insert(make_pair(p, n));
+    Nodes[p] = n;
 
-#ifdef PTG_DEBUG
-    errs() << "CREATE new node for "; p.first->dump();
-#endif
+    return n;
+}
+
+// get or create new node
+// it accesses Nodes only once contrary to findNode() + addNode()
+inline PointsToGraph::Node *PointsToGraph::getNode(Pointee P)
+{
+    // hmm, is this defined? If Node(P) does not exit,
+    // it could return some garbage.. Anyway, it looks like
+    // working
+    Node *&n = Nodes[P];
+
+    if (!n)
+        n = new Node(P);
 
     return n;
 }
@@ -363,65 +374,24 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 {
     bool changed = false;
 
-#ifdef PTG_DEBUG
-    errs() << " -- PTG_DEBUG insert start --\n";
-
-    errs() << "ptr: "; p.first->dump();
-    errs() << "ptee: "; location.first->dump();
-    errs() << "\n";
-#endif
-
     // find node that contains pointer p. From this node will
     // be created new outgoing edge (if needed)
     PointsToGraph::Node *From = NULL, *To = NULL;
-    From = findNode(p);
 
-    // if pointer p appears first time
-    if (!From) {
-        From = addNode(p);
-    }
-
+    From = getNode(p);
     To = shouldAddTo(From, location);
 
     if (To) {
         ///
         // insert location into existing node if it's appropriated
         ///
-#ifdef PTG_DEBUG
-        errs() << "ADD"; location.first->dump();
-        errs() << "to node where is ";
-        (To->getElements().cbegin())->first->dump();
-#endif
 
         changed = To->insert(location);
         Nodes[location] = To;
-    } else if ((To = findNode(location))) {
-        ///
-        // if the location is already in some node, use this node
-        ///
-#ifdef PTG_DEBUG
-        errs() << "ADD EDGE to node where is";
-        (To->getElements().cbegin())->first->dump();
-#endif
-
-        changed = From->addNeighbour(To);
     } else {
-        ///
-        // the node doesn't exists, create new one
-        ///
-
-#ifdef PTG_DEBUG
-        errs() << "ADD EDGE from node where is ";
-        (From->getElements().cbegin())->first->dump();
-        errs() << "to node "; location.first->dump();
-#endif
-
-        To = addNode(location);
+        To = getNode(location);
         changed = From->addNeighbour(To);
     }
-#ifdef PTG_DEBUG
-    errs() << " -- PTG_DEBUG insert end --\n";
-#endif
 
     return changed;
 }
@@ -452,15 +422,10 @@ bool PointsToGraph::insertDerefPointee(Node *PointerNode, Node *LocationNode)
 
 bool PointsToGraph::insertDerefPointee(Pointer p, Node *LocationNode)
 {
-    PointsToGraph::Node *PointerNode;
-
     if (!LocationNode->hasNeighbours())
         return false;
 
-    if (!(PointerNode = findNode(p)))
-        PointerNode = addNode(p);
-
-    return insertDerefPointee(PointerNode, LocationNode);
+    return insertDerefPointee(getNode(p), LocationNode);
 }
 
 bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
@@ -496,15 +461,10 @@ bool PointsToGraph::insertDerefPointer(Node *PointerNode, Node *LocationNode)
 
 bool PointsToGraph::insertDerefPointer(Node *PointerNode, Pointee location)
 {
-    PointsToGraph::Node *LocationNode;
-
     if (!PointerNode->hasNeighbours())
         return false;
 
-    if (!(LocationNode = findNode(location)))
-        LocationNode = addNode(location);
-
-    return insertDerefPointer(PointerNode, LocationNode);
+    return insertDerefPointer(PointerNode, getNode(location));
 }
 
 
