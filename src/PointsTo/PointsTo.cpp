@@ -339,7 +339,7 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
     for (; I != E; ++I)
         // since node can contain only elements from the same category
         // it's sufficent to check only one element from each node
-        if (PTC->areInSameCategory(*((*I)->getElements().begin()), p))
+        if (PTC->areInSameCategory((*I)->getOrigin(), p))
             return *I;
 
     return NULL;

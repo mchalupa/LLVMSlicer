@@ -178,7 +178,8 @@ namespace ptr {
             typedef llvm::SmallSetVector<Pointee, 32> ElementsTy;
 
             Node() {};
-            Node(Pointee p) { insert(p); }
+            Node(Pointee p)
+                :origin(p) { insert(p); }
 
             bool insert(Pointee p)
             {
@@ -190,6 +191,9 @@ namespace ptr {
 
             std::set<Node *>& getEdges(void) { return Edges; }
             const std::set<Node *>& getEdges(void) const { return Edges; }
+
+            Pointee getOrigin() { return origin; }
+            const Pointee& getOrigin() const { return origin; }
 
             bool addNeighbour(Node *n)
             {
@@ -209,6 +213,8 @@ namespace ptr {
         private:
             ElementsTy Elements; // items in node
             std::set<Node *> Edges; // edges to another nodes
+
+            Pointee origin;
         };
 
         const PointsToCategories *getCategories(void) const
