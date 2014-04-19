@@ -196,5 +196,37 @@ bool FixedCategories::areInSameCategory(PointsToGraph::Pointer a,
     assert(0 && "Haven't found pointer a");
 }
 
+unsigned int FixedCategories::getCategory(PointsToGraph::Pointer a) const
+{
+    std::set<std::set<PointsToGraph::Pointer> >::const_iterator I, E;
+
+    unsigned int num = 0;
+    for (I = Categories.cbegin(), E = Categories.cend(); I != E; ++I) {
+        if (I->count(a))
+	    return num;
+
+	++num;
+    }
+
+    return num;
+}
+
+unsigned int AllInSelfCategory::getCategory(PointsToGraph::Pointer a) const
+{
+    std::map<TestPointer, Pointer>::const_iterator I, E;
+    unsigned int num = 0;
+
+    for (I = valueMap.cbegin(), E = valueMap.cend(); I != E; ++I) {
+	if (I->second == a)
+		return num;
+	++num;
+    }
+
+    // the pointer must have been used before
+    assert(0 && "Pointer not found");
+}
+
+
+
 } // namespace ptr
 } // namespace llvm

@@ -924,11 +924,7 @@ PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S,
     PointsToSets TmpPTS;
     unsigned int Runs, I;
 
-    // if K is UINT_MAX, then use Andersen-like analysis
-    if (K == UINT_MAX) {
-        PointsToGraph PTG(&P, new AllInSelfCategory());
-        PTG.toPointsToSets(S);
-    } if (K) {
+    if (K) {
         Runs = (unsigned int) (log(K) / log(2)); // transfer to base of 2
         if (!Runs)
             Runs = 1;

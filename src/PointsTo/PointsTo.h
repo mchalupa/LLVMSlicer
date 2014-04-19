@@ -118,6 +118,7 @@ namespace ptr {
         virtual ~PointsToCategories() {}
 
         virtual bool areInSameCategory(Pointer a, Pointer b) const = 0;
+        virtual unsigned int getCategory(Pointer a) const = 0;
     };
 
     // implies Steengaard's analysis
@@ -125,19 +126,10 @@ namespace ptr {
     {
     public:
         virtual bool areInSameCategory(Pointer a, Pointer b) const
-        {
-            return true;
-        }
-    };
+            { return true; }
 
-    // implies Andersen's analysis
-    class AllInSelfCategory : public PointsToCategories
-    {
-    public:
-        virtual bool areInSameCategory(Pointer a, Pointer b) const
-        {
-            return false;
-        }
+        virtual unsigned int getCategory(Pointer a) const
+            { return 0; }
     };
 
     class IDBitsCategory : public PointsToCategories
@@ -150,6 +142,9 @@ namespace ptr {
             return (((a.first->getValueID() >> K) & 0x1)
                     == ((b.first->getValueID() >> K) & 0x1));
         }
+
+        virtual unsigned int getCategory(Pointer a) const
+            { return (((a.first->getValueID() ^ a.second) >> K) & 0x1); }
     private:
         // use Kth bit of ID
         unsigned int K;

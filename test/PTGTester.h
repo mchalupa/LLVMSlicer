@@ -145,10 +145,18 @@ public:
     }
 
     virtual bool areInSameCategory(Pointer a, Pointer b) const;
+    virtual unsigned int getCategory(Pointer a) const;
 private:
     std::set<std::set<Pointer> > Categories;
 };
 
+class AllInSelfCategory : public PointsToCategories
+{
+public:
+    virtual bool areInSameCategory(Pointer a, Pointer b) const
+	{ return false; }
+    virtual unsigned int getCategory(Pointer a) const;
+};
 
 } // namespace ptr
 } // namespace llvm
