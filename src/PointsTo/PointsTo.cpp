@@ -344,7 +344,7 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
 
 inline PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
 {
-    PointsToGraph::Node *n = new PointsToGraph::Node(p);
+    Node *n = new Node(p, PTC);
     Nodes[p] = n;
 
     return n;
@@ -360,7 +360,7 @@ inline PointsToGraph::Node *PointsToGraph::getNode(Pointee P)
     Node *&n = Nodes[P];
 
     if (!n)
-        n = new Node(P);
+        n = new Node(P, PTC);
 
     return n;
 }

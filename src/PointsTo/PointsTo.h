@@ -179,8 +179,8 @@ namespace ptr {
             typedef llvm::SmallSetVector<Node *, 16> EdgesTy;
 
             Node() {};
-            Node(Pointee p)
-                :origin(p) { insert(p); }
+            Node(Pointee p, PointsToCategories *PTC)
+                :origin(p), PTC(PTC) { insert(p); }
 
             bool insert(Pointee p)
             {
@@ -195,6 +195,11 @@ namespace ptr {
 
             Pointee getOrigin() { return origin; }
             const Pointee& getOrigin() const { return origin; }
+
+            unsigned int getCategory() const
+                // XXX wouldn't it be better to store it in constructor?
+                // it can be called many times
+                { return PTC->getCategory(origin); }
 
             bool addNeighbour(Node *n)
             {
@@ -216,6 +221,7 @@ namespace ptr {
             EdgesTy Edges; // edges to another nodes
 
             Pointee origin;
+            PointsToCategories *PTC;
         };
 
         const PointsToCategories *getCategories(void) const
