@@ -180,21 +180,18 @@ namespace ptr {
         class Node
         {
         public:
+            typedef llvm::SmallSetVector<Pointee, 32> ElementsTy;
+
             Node() {};
             Node(Pointee p) { insert(p); }
 
-            bool contains(Pointee p) const
-            {
-                return Elements.find(p) != Elements.end();
-            }
-
             bool insert(Pointee p)
             {
-                return Elements.insert(p).second;
+                return Elements.insert(p);
             }
 
-            std::set<Pointee>& getElements(void) { return Elements; }
-            const std::set<Pointee>& getElements(void) const { return Elements; }
+            ElementsTy& getElements(void) { return Elements; }
+            const ElementsTy& getElements(void) const { return Elements; }
 
             std::set<Node *>& getEdges(void) { return Edges; }
             const std::set<Node *>& getEdges(void) const { return Edges; }
@@ -215,7 +212,7 @@ namespace ptr {
             void dump(void) const;
 
         private:
-            std::set<Pointee> Elements; // items in node
+            ElementsTy Elements; // items in node
             std::set<Node *> Edges; // edges to another nodes
         };
 

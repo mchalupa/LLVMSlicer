@@ -250,14 +250,12 @@ static void printPtrName(const PointsToGraph::Pointee p)
 
 void PointsToGraph::Node::dump(void) const
 {
-    std::set<Pointee>::const_iterator Begin;
-    std::set<Pointee>::const_iterator I, E;
-
-    Begin = I = Elements.cbegin();
+    ElementsTy::iterator Begin = Elements.begin();
 
     errs() << "[";
 
-    for (E = Elements.cend(); I != E; ++I) {
+    for (ElementsTy::iterator I = Begin, E = Elements.end();
+         I != E; ++I) {
         if (I != Begin)
             errs() << ", ";
 
@@ -295,11 +293,11 @@ void PointsToGraph::dump(void) const
 void PointsToGraph::replaceNode(PointsToGraph::Node *a,
                                 PointsToGraph::Node *b)
 {
-    std::set<Pointee>::iterator I, E;
-    std::set<Pointee>& Elements = a->getElements();
+    Node::ElementsTy& Elements = a->getElements();
 
     // we must zero out all occurences in the map
-    for (I = Elements.begin(), E = Elements.end(); I != E; ++I) {
+    for (Node::ElementsTy::iterator I = Elements.begin(), E = Elements.end();
+         I != E; ++I) {
         Node *&n = Nodes[*I];
         /*
         if (n != a) {
@@ -341,7 +339,7 @@ PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
     for (; I != E; ++I)
         // since node can contain only elements from the same category
         // it's sufficent to check only one element from each node
-        if (PTC->areInSameCategory(*((*I)->getElements().cbegin()), p))
+        if (PTC->areInSameCategory(*((*I)->getElements().begin()), p))
             return *I;
 
     return NULL;
@@ -500,18 +498,17 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
     typedef PointsToSets::PointsToSet PTSet;
     typedef PointsToSets::Pointer Ptr;
 
-    std::set<Pointee>::const_iterator ElemI, ElemE;
     std::set<Node *>::const_iterator EdgesI, EdgesE;
 
-    for (ElemI = Elements.cbegin(), ElemE = Elements.cend();
-            ElemI != ElemE; ++ElemI) {
+    for (ElementsTy::iterator ElemI = Elements.begin(), ElemE = Elements.end();
+         ElemI != ElemE; ++ElemI) {
 
         PTSet& S = PS[*ElemI];
         PTSet TmpPTSet;
 
         for (EdgesI = Edges.cbegin(), EdgesE = Edges.cend();
              EdgesI != EdgesE; ++EdgesI) {
-            const PTSet& Ptees = (*EdgesI)->getElements();
+            const Node::ElementsTy& Ptees = (*EdgesI)->getElements();
 
             if (intersect) {
                 // when creating intersection, add the intersection into
@@ -647,10 +644,10 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
 
         std::set<Node *>& Edges = n->getEdges();
         std::set<Node *>::const_iterator NI, NE;
-        std::set<Pointee>::const_iterator PI, PE;
         for (NI = Edges.cbegin(), NE = Edges.cend(); NI != NE; ++NI) {
-            std::set<Pointee>& Elems = (*NI)->getElements();
-            for (PI = Elems.cbegin(), PE = Elems.cend(); PI != PE; ++PI) {
+            Node::ElementsTy& Elems = (*NI)->getElements();
+            for (Node::ElementsTy::iterator PI = Elems.begin(),
+                 PE = Elems.end(); PI != PE; ++PI) {
                 assert(PI->second >= 0);
 
                 const Value *val = PI->first;
