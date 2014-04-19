@@ -268,7 +268,6 @@ void PointsToGraph::Node::dump(void) const
 void PointsToGraph::dump(void) const
 {
     std::unordered_map<Pointer, Node *>::const_iterator I, E;
-    std::set<PointsToGraph::Node *>::const_iterator II, EE;
 
     if (Nodes.empty()) {
         errs() << "PointsToGraph is empty\n";
@@ -281,9 +280,9 @@ void PointsToGraph::dump(void) const
 
         I->second->dump();
 
-        for (II = (I->second)->getEdges().begin(),
-             EE = (I->second)->getEdges().end();
-                II != EE; ++II) {
+        Node::EdgesTy& Edges = I->second->getEdges();
+        for (Node::EdgesTy::const_iterator II = Edges.begin(), EE = Edges.end();
+             II != EE; ++II) {
             errs() << "    --> ";
             (*II)->dump();
         }
@@ -332,11 +331,9 @@ inline PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
 PointsToGraph::Node *
 PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
 {
-    std::set<Node *>::const_iterator I, E;
-    I = root->getEdges().cbegin();
-    E = root->getEdges().cend();
-
-    for (; I != E; ++I)
+    Node::EdgesTy& Edges = root->getEdges();
+    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
+         I != E; ++I)
         // since node can contain only elements from the same category
         // it's sufficent to check only one element from each node
         if (PTC->areInSameCategory((*I)->getOrigin(), p))
@@ -409,10 +406,10 @@ bool PointsToGraph::insertDerefPointee(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    std::set<PointsToGraph::Node *>::iterator I, E;
-    std::set<PointsToGraph::Node *>& Edges = LocationNode->getEdges();
+    Node::EdgesTy& Edges = LocationNode->getEdges();
 
-    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
+         I != E; ++I)
        changed |= PointerNode->addNeighbour(*I);
 
     return changed;
@@ -448,10 +445,10 @@ bool PointsToGraph::insertDerefPointer(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    std::set<PointsToGraph::Node *>::iterator I, E;
-    std::set<PointsToGraph::Node *>& Edges = PointerNode->getEdges();
+    Node::EdgesTy& Edges = PointerNode->getEdges();
 
-    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
+         I != E; ++I)
         changed |= (*I)->addNeighbour(LocationNode);
 
     return changed;
@@ -483,10 +480,10 @@ bool PointsToGraph::insertDerefBoth(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    std::set<PointsToGraph::Node *>::iterator I, E;
-    std::set<PointsToGraph::Node *>& Edges = PointerNode->getEdges();
+    Node::EdgesTy& Edges = PointerNode->getEdges();
 
-    for (I = Edges.begin(), E = Edges.end(); I != E; ++I)
+    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
+         I != E; ++I)
         changed |= insertDerefPointee(*I, LocationNode);
 
     return changed;
@@ -498,16 +495,14 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
     typedef PointsToSets::PointsToSet PTSet;
     typedef PointsToSets::Pointer Ptr;
 
-    std::set<Node *>::const_iterator EdgesI, EdgesE;
-
     for (ElementsTy::iterator ElemI = Elements.begin(), ElemE = Elements.end();
          ElemI != ElemE; ++ElemI) {
 
         PTSet& S = PS[*ElemI];
         PTSet TmpPTSet;
 
-        for (EdgesI = Edges.cbegin(), EdgesE = Edges.cend();
-             EdgesI != EdgesE; ++EdgesI) {
+        for (Node::EdgesTy::const_iterator EdgesI = Edges.begin(),
+             EdgesE = Edges.end(); EdgesI != EdgesE; ++EdgesI) {
             const Node::ElementsTy& Ptees = (*EdgesI)->getElements();
 
             if (intersect) {
@@ -642,9 +637,9 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
         if (!n->hasNeighbours())
             return false;
 
-        std::set<Node *>& Edges = n->getEdges();
-        std::set<Node *>::const_iterator NI, NE;
-        for (NI = Edges.cbegin(), NE = Edges.cend(); NI != NE; ++NI) {
+        Node::EdgesTy& Edges = n->getEdges();
+        for (Node::EdgesTy::const_iterator NI = Edges.begin(), NE = Edges.end();
+             NI != NE; ++NI) {
             Node::ElementsTy& Elems = (*NI)->getElements();
             for (Node::ElementsTy::iterator PI = Elems.begin(),
                  PE = Elems.end(); PI != PE; ++PI) {
@@ -704,9 +699,9 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     if (!r)
         return false;
 
-    std::set<Node *>::const_iterator II, EE;
-    std::set<Node *>& Edges = r->getEdges();
-    for (II = Edges.cbegin(), EE = Edges.cend(); II != EE; ++II)
+    Node::EdgesTy& Edges = r->getEdges();
+    for (Node::EdgesTy::const_iterator II = Edges.begin(), EE = Edges.end();
+         II != EE; ++II)
         // must process nodes *two* steps away
         change |= insertDerefPointee(L, *II);
 
@@ -764,12 +759,12 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     if (!r)
         return false;
 
-    std::set<Node *>::const_iterator II, EE;
     // copy current edges, because we can change these edges, but
     // we want to work only with these edges
     // XXX don't we need copying even when dereferencing only one side??
-    std::set<Node *> Edges = r->getEdges();
-    for (II = Edges.cbegin(), EE = Edges.cend(); II != EE; ++II)
+    Node::EdgesTy Edges = r->getEdges();
+    for (Node::EdgesTy::iterator II = Edges.begin(), EE = Edges.end();
+         II != EE; ++II)
         change |= insertDerefBoth(l, *II);
 
     return change;
