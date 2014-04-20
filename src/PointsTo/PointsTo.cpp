@@ -280,11 +280,13 @@ void PointsToGraph::dump(void) const
 
         I->second->dump();
 
-        Node::EdgesTy& Edges = I->second->getEdges();
-        for (Node::EdgesTy::const_iterator II = Edges.begin(), EE = Edges.end();
-             II != EE; ++II) {
+        Node::EdgesTy Edges = I->second->getEdges();
+        for (unsigned int I = 0; I < Node::EDGES_NUM; ++I) {
+            if (!Edges[I])
+                continue;
+
             errs() << "    --> ";
-            (*II)->dump();
+            Edges[I]->dump();
         }
     }
 }
@@ -292,6 +294,8 @@ void PointsToGraph::dump(void) const
 void PointsToGraph::replaceNode(PointsToGraph::Node *a,
                                 PointsToGraph::Node *b)
 {
+    assert(a && "a must not be NULL");
+
     Node::ElementsTy& Elements = a->getElements();
 
     // we must zero out all occurences in the map
@@ -326,25 +330,9 @@ inline PointsToGraph::Node *PointsToGraph::findNode(Pointee p) const
         return I->second;
 }
 
-// take nodes outgoing from root and check if pointee p
-// should be added into one of them
-PointsToGraph::Node *
-PointsToGraph::shouldAddTo(PointsToGraph::Node *root, Pointee p)
-{
-    Node::EdgesTy& Edges = root->getEdges();
-    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
-         I != E; ++I)
-        // since node can contain only elements from the same category
-        // it's sufficent to check only one element from each node
-        if (PTC->areInSameCategory((*I)->getOrigin(), p))
-            return *I;
-
-    return NULL;
-}
-
 inline PointsToGraph::Node *PointsToGraph::addNode(Pointee p)
 {
-    Node *n = new Node(p, PTC);
+    Node *n = new Node(p, this);
     Nodes[p] = n;
 
     return n;
@@ -360,9 +348,59 @@ inline PointsToGraph::Node *PointsToGraph::getNode(Pointee P)
     Node *&n = Nodes[P];
 
     if (!n)
-        n = new Node(P, PTC);
+        n = new Node(P, this);
 
     return n;
+}
+
+// XXX do in Node's member function?
+void PointsToGraph::replaceEdges(Node *a, Node *b)
+{
+    assert(a && "a must not be NULL");
+    assert(b && "b must not be NULL");
+
+    Node::ReferencesTy& References = b->getReferences();
+    Node::EdgesTy Edges = b->getEdges();
+
+    // change edges that points to b so that they will point to a
+    for (Node::ReferencesTy::iterator I = References.begin(),
+         E = References.end(); I != E; ++I) {
+
+         // delete edges that points to b
+         (*I)->getEdges()[b->getCategory()] = NULL;
+         // and add edges that points to a instead
+         (*I)->addNeighbour(a);
+    }
+
+    // change references of outgoing edges
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I]) {
+            Edges[I]->getReferences().erase(b);
+            a->addNeighbour(Edges[I]);
+        }
+}
+
+
+void PointsToGraph::mergeNodes(Node *a, Node *b)
+{
+    Node::ElementsTy& ElementsB = b->getElements();
+
+    // copy elements from b to a
+    for (Node::ElementsTy::iterator I = ElementsB.begin(), E = ElementsB.end();
+         I != E; ++I) {
+        a->insert(*I);
+
+        // set new location node for the element
+        Nodes[*I] = a;
+    }
+
+    // make all nodes that point to b point to a
+    replaceEdges(a, b);
+
+    delete b;
+
+    // if there were some edges with the same category, then these should
+    // be merged in addNeighbour called from replaceEdges, so we're done here
 }
 
 bool PointsToGraph::insert(Pointer p, Pointee location)
@@ -371,21 +409,28 @@ bool PointsToGraph::insert(Pointer p, Pointee location)
 
     // find node that contains pointer p. From this node will
     // be created new outgoing edge (if needed)
-    PointsToGraph::Node *From = NULL, *To = NULL;
+    PointsToGraph::Node *From, *To;
 
     From = getNode(p);
-    To = shouldAddTo(From, location);
+    To = findNode(location);
 
     if (To) {
-        ///
-        // insert location into existing node if it's appropriated
-        ///
-
-        changed = To->insert(location);
-        Nodes[location] = To;
-    } else {
-        To = getNode(location);
+        // addNeighbour should merge the nodes if necessary
         changed = From->addNeighbour(To);
+    } else {
+        // pointer is not in any node. Check if From node
+        // has neighbour with the same category. If so, just
+        // add the pointer there
+        Node *n = From->getEdges()[PTC->getCategory(location)]; 
+
+        if (n) {
+            n->insert(location);
+            Nodes[location] = n;
+            changed = true;
+        } else {
+            To = getNode(location);
+            changed = From->addNeighbour(To);
+        }
     }
 
     return changed;
@@ -406,11 +451,11 @@ bool PointsToGraph::insertDerefPointee(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    Node::EdgesTy& Edges = LocationNode->getEdges();
+    Node::EdgesTy Edges = LocationNode->getEdges();
 
-    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
-         I != E; ++I)
-       changed |= PointerNode->addNeighbour(*I);
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I])
+            changed |= PointerNode->addNeighbour(Edges[I]);
 
     return changed;
 }
@@ -445,11 +490,11 @@ bool PointsToGraph::insertDerefPointer(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    Node::EdgesTy& Edges = PointerNode->getEdges();
+    Node::EdgesTy Edges = PointerNode->getEdges();
 
-    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
-         I != E; ++I)
-        changed |= (*I)->addNeighbour(LocationNode);
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I])
+            changed |= Edges[I]->addNeighbour(LocationNode);
 
     return changed;
 }
@@ -480,11 +525,11 @@ bool PointsToGraph::insertDerefBoth(Node *PointerNode, Node *LocationNode)
 {
     bool changed = false;
 
-    Node::EdgesTy& Edges = PointerNode->getEdges();
+    Node::EdgesTy Edges = PointerNode->getEdges();
 
-    for (Node::EdgesTy::iterator I = Edges.begin(), E = Edges.end();
-         I != E; ++I)
-        changed |= insertDerefPointee(*I, LocationNode);
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I])
+            changed |= insertDerefPointee(Edges[I], LocationNode);
 
     return changed;
 }
@@ -501,9 +546,11 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
         PTSet& S = PS[*ElemI];
         PTSet TmpPTSet;
 
-        for (Node::EdgesTy::const_iterator EdgesI = Edges.begin(),
-             EdgesE = Edges.end(); EdgesI != EdgesE; ++EdgesI) {
-            const Node::ElementsTy& Ptees = (*EdgesI)->getElements();
+        for (unsigned int I = 0; I < EDGES_NUM; ++I) {
+            if (!Edges[I])
+                continue;
+
+            const ElementsTy& Ptees = Edges[I]->getElements();
 
             if (intersect) {
                 // when creating intersection, add the intersection into
@@ -637,10 +684,12 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
         if (!n->hasNeighbours())
             return false;
 
-        Node::EdgesTy& Edges = n->getEdges();
-        for (Node::EdgesTy::const_iterator NI = Edges.begin(), NE = Edges.end();
-             NI != NE; ++NI) {
-            Node::ElementsTy& Elems = (*NI)->getElements();
+        Node::EdgesTy Edges = n->getEdges();
+        for (unsigned int I = 0; I < Node::EDGES_NUM; ++I) {
+            if (!Edges[I])
+                continue;
+
+            Node::ElementsTy& Elems = Edges[I]->getElements();
             for (Node::ElementsTy::iterator PI = Elems.begin(),
                  PE = Elems.end(); PI != PE; ++PI) {
                 assert(PI->second >= 0);
@@ -699,11 +748,11 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     if (!r)
         return false;
 
-    Node::EdgesTy& Edges = r->getEdges();
-    for (Node::EdgesTy::const_iterator II = Edges.begin(), EE = Edges.end();
-         II != EE; ++II)
-        // must process nodes *two* steps away
-        change |= insertDerefPointee(L, *II);
+    Node::EdgesTy Edges = r->getEdges();
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I])
+            // must process nodes *two* steps away
+            change |= insertDerefPointee(L, Edges[I]);
 
     return change;
 }
@@ -762,10 +811,11 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     // copy current edges, because we can change these edges, but
     // we want to work only with these edges
     // XXX don't we need copying even when dereferencing only one side??
-    Node::EdgesTy Edges = r->getEdges();
-    for (Node::EdgesTy::iterator II = Edges.begin(), EE = Edges.end();
-         II != EE; ++II)
-        change |= insertDerefBoth(l, *II);
+    Node *Edges[NODE_EDGES_NUM];
+    memcpy(&Edges, r->getEdges(), sizeof Edges);
+    for (unsigned int I = 0; I < Node::EDGES_NUM; ++I)
+        if (Edges[I])
+            change |= insertDerefBoth(l, Edges[I]);
 
     return change;
 }

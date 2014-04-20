@@ -176,11 +176,16 @@ namespace ptr {
         {
         public:
             typedef llvm::SmallSetVector<Pointee, 32> ElementsTy;
-            typedef llvm::SmallSetVector<Node *, 16> EdgesTy;
+            typedef llvm::SmallPtrSet<Node *, 16> ReferencesTy;
+
+            typedef Node** EdgesTy;
+            #define NODE_EDGES_NUM 8
+            static const unsigned int EDGES_NUM = NODE_EDGES_NUM;
 
             Node() {};
-            Node(Pointee p, PointsToCategories *PTC)
-                :origin(p), PTC(PTC) { insert(p); }
+            Node(Pointee p, PointsToGraph *PTG)
+                :origin(p), PTG(PTG)
+                { insert(p); Category = PTG->getCategories()->getCategory(p); }
 
             bool insert(Pointee p)
             {
@@ -190,25 +195,41 @@ namespace ptr {
             ElementsTy& getElements(void) { return Elements; }
             const ElementsTy& getElements(void) const { return Elements; }
 
-            EdgesTy& getEdges(void) { return Edges; }
-            const EdgesTy& getEdges(void) const { return Edges; }
+            EdgesTy getEdges(void) { return Edges; }
+            const Node * const * getEdges(void) const { return Edges; }
+            ReferencesTy& getReferences(void) { return References; }
+            const ReferencesTy& getReferences(void) const { return References; }
 
             Pointee getOrigin() { return origin; }
             const Pointee& getOrigin() const { return origin; }
 
             unsigned int getCategory() const
-                // XXX wouldn't it be better to store it in constructor?
-                // it can be called many times
-                { return PTC->getCategory(origin); }
+                { return Category; }
 
             bool addNeighbour(Node *n)
             {
-                return Edges.insert(n);
+
+                unsigned c = n->getCategory();
+                assert(c < NODE_EDGES_NUM);
+
+                if (Edges[c]) {
+                    if (Edges[c] == n)
+                        return false;
+                    // if there already exists a node with the same
+                    // category, merge them
+                    PTG->mergeNodes(Edges[c], n);
+                } else {
+                    Edges[c] = n;
+                    n->References.insert(this);
+                    ++EdgesNo;
+                }
+
+                return true;
             }
 
-            bool hasNeighbours(void) const
+            inline bool hasNeighbours(void) const
             {
-                return !Edges.empty();
+                return EdgesNo > 0;
             }
 
             void convertToPointsToSets(PointsToSets& PS,
@@ -218,10 +239,13 @@ namespace ptr {
 
         private:
             ElementsTy Elements; // items in node
-            EdgesTy Edges; // edges to another nodes
+            ReferencesTy References; // what nodes points to this one?
+            Node *Edges[NODE_EDGES_NUM] = {0};
+            unsigned int EdgesNo = 0;
 
             Pointee origin;
-            PointsToCategories *PTC;
+            PointsToGraph *PTG;
+            unsigned int Category;
         };
 
         const PointsToCategories *getCategories(void) const
@@ -243,10 +267,6 @@ namespace ptr {
         bool insertDerefPointer(Node *PointerNode, Node *LocationNode);
         bool insertDerefBoth(Node *PointerNode, Node *LocationNode);
 
-        // return Node that the pointee should be merged to
-        // or NULL
-        Node *shouldAddTo(Node *root, Pointee p);
-
         // add new node
         Node *addNode(Pointee p);
 
@@ -257,7 +277,9 @@ namespace ptr {
 
         // replace node in map
         void replaceNode(Node *, Node *);
+        void replaceEdges(Node *, Node *);
 
+        void mergeNodes(Node *, Node *);
         // hash table Pointer->Node
         std::unordered_map<Pointer, Node *> Nodes;
         const ProgramStructure *PS;
