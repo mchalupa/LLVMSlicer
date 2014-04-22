@@ -175,7 +175,7 @@ namespace ptr {
         class Node
         {
         public:
-            typedef llvm::SmallSetVector<Pointee, 32> ElementsTy;
+            typedef std::set<Pointee> ElementsTy;
             typedef llvm::SmallPtrSet<Node *, 16> ReferencesTy;
 
             typedef Node** EdgesTy;
@@ -187,9 +187,9 @@ namespace ptr {
                 :origin(p), PTG(PTG)
                 { insert(p); Category = PTG->getCategories()->getCategory(p); }
 
-            bool insert(Pointee p)
+            inline void insert(Pointee p)
             {
-                return Elements.insert(p);
+                Elements.insert(p);
             }
 
             ElementsTy& getElements(void) { return Elements; }

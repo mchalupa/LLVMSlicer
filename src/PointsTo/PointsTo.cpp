@@ -250,11 +250,11 @@ static void printPtrName(const PointsToGraph::Pointee p)
 
 void PointsToGraph::Node::dump(void) const
 {
-    ElementsTy::iterator Begin = Elements.begin();
+    ElementsTy::const_iterator Begin = Elements.begin();
 
     errs() << "[";
 
-    for (ElementsTy::iterator I = Begin, E = Elements.end();
+    for (ElementsTy::const_iterator I = Begin, E = Elements.end();
          I != E; ++I) {
         if (I != Begin)
             errs() << ", ";
@@ -540,7 +540,8 @@ void PointsToGraph::Node::convertToPointsToSets(PointsToSets& PS,
     typedef PointsToSets::PointsToSet PTSet;
     typedef PointsToSets::Pointer Ptr;
 
-    for (ElementsTy::iterator ElemI = Elements.begin(), ElemE = Elements.end();
+    for (ElementsTy::const_iterator ElemI = Elements.begin(),
+         ElemE = Elements.end();
          ElemI != ElemE; ++ElemI) {
 
         PTSet& S = PS[*ElemI];
