@@ -675,14 +675,15 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
 
     if (hasExtraReference(op)) {
         changed = insert(L, Ptr(op, off)); /* VAR = REF */
-    } else { /* VAR = VAR */
+    } else if (isArray) {
+        // leave arrays handling unsliced atm
+        changed = insert(L, Ptr(op, 0));
+    }else { /* VAR = VAR */
+
         Ptr R(op, -1);
         Node *n = findNode(R);
 
-        if (!n)
-            return false;
-
-        if (!n->hasNeighbours())
+        if (!n || !n->hasNeighbours())
             return false;
 
         Node::EdgesTy Edges = n->getEdges();
@@ -693,27 +694,21 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
             Node::ElementsTy& Elems = Edges[I]->getElements();
             for (Node::ElementsTy::iterator PI = Elems.begin(),
                  PE = Elems.end(); PI != PE; ++PI) {
-                assert(PI->second >= 0);
+
+                 // offset with variable has no meaning
+                 if (PI->second == -1)
+                    continue;
 
                 const Value *val = PI->first;
 
-                if (off && (isa<Function>(val) || isa<ConstantPointerNull>(val)))
+                // there's no point to have offset with these values
+                if (isa<Function>(val) || isa<ConstantPointerNull>(val))
                     continue;
 
                 int64_t sum = PI->second + off;
 
                 if (!checkOffset(DL, val, sum))
                     continue;
-
-                // XXX crop > 64
-                if (sum < 0) {
-                    assert (PI->second >= 0);
-                    sum = 0;
-                }
-
-                /* an unsoudness :) */
-                if (isArray && sum > 64)
-                    sum = 64;
 
                 changed |= insert(L, Ptr(val, sum));
             }
