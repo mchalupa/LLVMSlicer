@@ -222,8 +222,11 @@ unsigned int AllInSelfCategory::getCategory(PointsToGraph::Pointer a) const
 	++num;
     }
 
-    // the pointer must have been used before
-    assert(0 && "Pointer not found");
+    // if the pointer does not exist (in the case of GEP), create it
+    assert(a.second >= 0);
+    valueMap[TestPointer(a.first->getName().data(), a.second)] = a;
+
+    return num;
 }
 
 
