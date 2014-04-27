@@ -116,8 +116,6 @@ namespace ptr {
         typedef PointsToSets::Pointer Pointer;
 
         virtual ~PointsToCategories() {}
-
-        virtual bool areInSameCategory(Pointer a, Pointer b) const = 0;
         virtual unsigned int getCategory(Pointer a) const = 0;
     };
 
@@ -125,9 +123,6 @@ namespace ptr {
     class AllInOneCategory : public PointsToCategories
     {
     public:
-        virtual bool areInSameCategory(Pointer a, Pointer b) const
-            { return true; }
-
         virtual unsigned int getCategory(Pointer a) const
             { return 0; }
     };
@@ -136,12 +131,6 @@ namespace ptr {
     {
     public:
         IDBitsCategory(unsigned int K) { this->K = K; }
-        virtual bool areInSameCategory(Pointer a, Pointer b) const
-        {
-            // compare Kth bits of IDs
-            return (((a.first->getValueID() >> K) & 0x1)
-                    == ((b.first->getValueID() >> K) & 0x1));
-        }
 
         virtual unsigned int getCategory(Pointer a) const
             { return (((a.first->getValueID() ^ a.second) >> K) & 0x1); }
