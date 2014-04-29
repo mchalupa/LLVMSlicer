@@ -1,4 +1,5 @@
 #include "PTGTester.h"
+#include <llvm/ADT/MapVector.h>
 
 using namespace llvm;
 
@@ -9,7 +10,7 @@ typedef std::pair<const char *, int64_t > TestPointer;
 static int failed = 0;
 static int total = 0;
 
-static std::map<TestPointer, Pointer> valueMap;
+static MapVector<TestPointer, Pointer> valueMap;
 static std::map<const char *, Value *> llvmValues;
 
 void dumpPointsToSets(ptr::PointsToSets& PS)
@@ -66,10 +67,12 @@ Pointer getPointer(Module *M, const char *name, int64_t off)
 {
     Value *va;
 
+    MapVector<TestPointer, Pointer>::iterator E = valueMap.end();
+    Pointer& p = valueMap[TestPointer(name, off)];
 
-    std::map<TestPointer, Pointer>::iterator I
-                                        = valueMap.find(TestPointer(name, off));
-    if (I == valueMap.end()) {
+    // if the last operation increased the size of valueMap, then
+    // the pointer does not exist
+    if (E != valueMap.end()) {
         // use always the same llvm value
         std::map<const char *, Value *>::iterator VI = llvmValues.find(name);
         if (VI == llvmValues.end()) {
@@ -84,14 +87,11 @@ Pointer getPointer(Module *M, const char *name, int64_t off)
             va = VI->second;
         }
 
-        TestPointer tp(name, off);
-        Pointer p(va, off);
-        valueMap.insert(std::make_pair(tp, p));
-
-        return p;
+	// copy it to map (p is reference)
+        p = Pointer(va, off);
     }
 
-    return I->second;
+    return p;
 }
 
 void addPointsTo(Module *M, PTGTester &PTG,
@@ -196,12 +196,13 @@ unsigned int FixedCategories::getCategory(PointsToGraph::Pointer a) const
 
 unsigned int AllInSelfCategory::getCategory(PointsToGraph::Pointer a) const
 {
-    std::map<TestPointer, Pointer>::const_iterator I, E;
+    MapVector<TestPointer, Pointer>::const_iterator I, E;
     unsigned int num = 0;
 
-    for (I = valueMap.cbegin(), E = valueMap.cend(); I != E; ++I) {
-	if (I->second == a)
+    for (I = valueMap.begin(), E = valueMap.end(); I != E; ++I) {
+	if (I->second == a) {
 		return num;
+	}
 	++num;
     }
 
