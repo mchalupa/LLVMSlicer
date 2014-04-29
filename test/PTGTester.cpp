@@ -159,6 +159,7 @@ bool check(PTGTester &PTG, ptr::PointsToSets &S)
     if (!check(PTGSet, S)) {
         errs() << "PTG:\n";
         PTG.getPTG().dump();
+	return false;
     }
 
     return true;
