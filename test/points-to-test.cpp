@@ -470,6 +470,48 @@ static bool fixedCateg4(PTGTester& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
+static std::set<std::set<Pointer> > categories5(void)
+{
+    std::set<std::set<Pointer> > Categories;
+    std::set<Pointer> C;
+
+    C.insert(getPointer(M, "a"));
+    C.insert(getPointer(M, "c"));
+    C.insert(getPointer(M, "e"));
+
+    Categories.insert(C);
+
+    C.clear();
+    C.insert(getPointer(M, "d"));
+    Categories.insert(C);
+
+    C.clear();
+    C.insert(getPointer(M, "b"));
+    Categories.insert(C);
+
+    return Categories;
+}
+
+static bool fixedCateg5(PTGTester& PTG)
+{
+    ptr::PointsToSets PTSets;
+
+    addPointsTo(M, PTG, "b", "a");
+    addPointsTo(M, PTG, "b", "c");
+    addPointsTo(M, PTG, "d", "e");
+    addPointsTo(M, PTG, "d", "a");
+
+    addPointsTo(M, PTSets, "b", "a");
+    addPointsTo(M, PTSets, "b", "c");
+    addPointsTo(M, PTSets, "b", "e");
+    addPointsTo(M, PTSets, "d", "e");
+    addPointsTo(M, PTSets, "d", "a");
+    addPointsTo(M, PTSets, "d", "c");
+
+    if (!check(PTG, PTSets))
+        errs() << "dump for " << __func__ << "\n";
+}
+
 static bool applyVarAsgnAlloc(PTGTester& PTG)
 {
     ptr::PointsToSets PTSets;
@@ -872,66 +914,6 @@ static bool applyDrefVarAsgnDref2(PTGTester& PTG)
         errs() << "dump for " << __func__ << "\n";
 }
 
-static void idBitsCateg(void)
-{
-    Pointer a = getPointer(M, "a");
-    Pointer b = getPointer(M, "b");
-    unsigned int AID = a.first->getValueID();
-    unsigned int BID = b.first->getValueID();
-
-    PointsToCategories *categ = new IDBitsCategory(0); // compare LSB
-    assert(categ->areInSameCategory(a, a));
-    assert(categ->areInSameCategory(b, b));
-
-    if ((AID & 0x1) == (BID & 0x1))
-        assert(categ->areInSameCategory(a, b));
-    else
-        assert(!categ->areInSameCategory(a, b));
-
-    AID = AID >> 1;
-    BID = BID >> 1;
-    delete categ;
-    categ = new IDBitsCategory(1);
-
-    if ((AID & 0x1) == (BID & 0x1))
-        assert(categ->areInSameCategory(a, b));
-    else
-        assert(!categ->areInSameCategory(a, b));
-
-    AID = AID >> 1;
-    BID = BID >> 1;
-    delete categ;
-    categ = new IDBitsCategory(2);
-
-    if ((AID & 0x1) == (BID & 0x1))
-        assert(categ->areInSameCategory(a, b));
-    else
-        assert(!categ->areInSameCategory(a, b));
-
-    AID = AID >> 1;
-    BID = BID >> 1;
-    delete categ;
-    categ = new IDBitsCategory(3);
-
-    if ((AID & 0x1) == (BID & 0x1))
-        assert(categ->areInSameCategory(a, b));
-    else
-        assert(!categ->areInSameCategory(a, b));
-
-
-    AID = AID >> 1;
-    BID = BID >> 1;
-    delete categ;
-    categ = new IDBitsCategory(4);
-
-    if ((AID & 0x1) == (BID & 0x1))
-        assert(categ->areInSameCategory(a, b));
-    else
-        assert(!categ->areInSameCategory(a, b));
-
-    delete categ;
-}
-
 static void toPointsToSets1(void)
 {
     ptr::PointsToGraph PTG(PS, new ptr::AllInSelfCategory);
@@ -1005,6 +987,62 @@ static void toPointsToSets2(void)
         errs() << "pts-to sets: " << __func__ << "\n";
 }
 
+static void toPointsToSets3(void)
+{
+    ptr::PointsToGraph PTG(PS, new ptr::AllInOneCategory);
+    ptr::PointsToSets A, B, C, D;
+
+    PTGTester T(&PTG);
+
+    // initialize graph with pts-to pairs
+    addPointsTo(M, T, "a", "b");
+    addPointsTo(M, T, "a", "c");
+    addPointsTo(M, T, "b", "c");
+    addPointsTo(M, T, "d", "c");
+    addPointsTo(M, T, "e", "d");
+    addPointsTo(M, T, "a", "d");
+    addPointsTo(M, T, "f", "a");
+    addPointsTo(M, T, "f", "e");
+
+    addPointsTo(M, A, "f", "a");
+    addPointsTo(M, A, "f", "e");
+    addPointsTo(M, A, "a", "b");
+    addPointsTo(M, A, "a", "c");
+    addPointsTo(M, A, "a", "d");
+    addPointsTo(M, A, "e", "b");
+    addPointsTo(M, A, "e", "c");
+    addPointsTo(M, A, "e", "d");
+    addPointsTo(M, A, "b", "b");
+    addPointsTo(M, A, "b", "c");
+    addPointsTo(M, A, "b", "d");
+    addPointsTo(M, A, "c", "b");
+    addPointsTo(M, A, "c", "c");
+    addPointsTo(M, A, "c", "d");
+    addPointsTo(M, A, "d", "b");
+    addPointsTo(M, A, "d", "c");
+    addPointsTo(M, A, "d", "d");
+
+    if (!check(T, A))
+        errs() << "pts-to sets (1): " << __func__ << "\n";
+
+    PTG.toPointsToSets(B);
+    assert(!B.getContainer().empty());
+
+    if (!check(A, B))
+        errs() << "pts-to sets (2): " << __func__ << "\n";
+
+    // this should not change the points-to sets
+    PTG.toPointsToSets(B);
+    assert(!B.getContainer().empty());
+
+    PTG.toPointsToSets(B);
+    PTG.toPointsToSets(B);
+    PTG.toPointsToSets(B);
+
+    if (!check(A, B))
+        errs() << "pts-to sets (3): " << __func__ << "\n";
+}
+
 int main(int argc, char **argv)
 {
 	LLVMContext context;
@@ -1013,7 +1051,7 @@ int main(int argc, char **argv)
     // test testing functions first
     test_test();
 
-	Module m("points-to-test", getGlobalContext());
+    Module m("points-to-test", getGlobalContext());
     M = &m;
 
     ptr::ProgramStructure ps(m);
@@ -1023,6 +1061,11 @@ int main(int argc, char **argv)
     buildPointsToGraph(figure1, new ptr::AllInOneCategory());
     buildPointsToGraph(figure2, new ptr::AllInOneCategory());
     buildPointsToGraph(figure3, new ptr::AllInOneCategory());
+
+    // do this until we convert PointsToGraph to be a template
+    assert(NODE_EDGES_NUM >= 32
+	   && "Graph must be compiled with more edges to run"
+	      "these tests");
 
     // these use Andersen analysis
     buildPointsToGraph(derefPointer1);
@@ -1041,6 +1084,7 @@ int main(int argc, char **argv)
     buildPointsToGraph(fixedCateg2, new ptr::FixedCategories(categories2()));
     buildPointsToGraph(fixedCateg3, new ptr::FixedCategories(categories3()));
     buildPointsToGraph(fixedCateg4, new ptr::FixedCategories(categories4()));
+    buildPointsToGraph(fixedCateg5, new ptr::FixedCategories(categories5()));
 
     // tests for applyRule's functions
     // use andersen-like categories
@@ -1056,12 +1100,10 @@ int main(int argc, char **argv)
     buildPointsToGraph(applyDrefVarAsgnDref2);
     notTested("var asgn gep");
 
-    // test categories
-    idBitsCateg();
-
     // test computePointsToSets
     toPointsToSets1();
     toPointsToSets2();
+    toPointsToSets3();
 
     std::pair<int, int>results = getResults();
 
