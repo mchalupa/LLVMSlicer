@@ -367,7 +367,7 @@ void PointsToGraph::replaceEdges(Node *a, Node *b)
          E = References.end(); I != E; ++I) {
 
          // delete edges that points to b
-         (*I)->getEdges()[b->getCategory()] = NULL;
+         (*I)->removeNeighbour(b->getCategory());
          // and add edges that points to a instead
          (*I)->addNeighbour(a);
     }

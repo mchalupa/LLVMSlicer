@@ -216,6 +216,21 @@ namespace ptr {
                 return true;
             }
 
+            void removeNeighbour(Node *n)
+            {
+                unsigned c = n->getCategory();
+                assert(Edges[c] == n);
+                Edges[c] = NULL; --EdgesNo;
+            }
+
+            void removeNeighbour(unsigned int c)
+            {
+                assert(Edges[c]);
+
+                --EdgesNo;
+                Edges[c] = NULL;
+            }
+
             inline bool hasNeighbours(void) const
             {
                 return EdgesNo > 0;
