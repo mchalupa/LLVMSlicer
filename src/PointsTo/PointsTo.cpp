@@ -671,14 +671,11 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
     const llvm::Value *op = elimConstExpr(gep->getPointerOperand());
     bool isArray = false;
     int64_t off = accumulateConstantOffset(gep, DL, isArray);
-    Ptr L = Ptr(lval, -1);
+    Ptr L(lval, -1);
 
     if (hasExtraReference(op)) {
         changed = insert(L, Ptr(op, off)); /* VAR = REF */
-    } else if (isArray) {
-        // leave arrays handling unsliced atm
-        changed = insert(L, Ptr(op, 0));
-    }else { /* VAR = VAR */
+    } else { /* VAR = VAR */
 
         Ptr R(op, -1);
         Node *n = findNode(R);
@@ -691,9 +688,12 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
             if (!Edges[I])
                 continue;
 
+            // if it's an array, go backward and find last offset
+            // (set is sorted). It can introduce some unsoundness,
+            // but for most cases it's working pretty well
             Node::ElementsTy& Elems = Edges[I]->getElements();
-            for (Node::ElementsTy::iterator PI = Elems.begin(),
-                 PE = Elems.end(); PI != PE; ++PI) {
+            Node::ElementsTy::reverse_iterator PI, PE;
+            for (PI = Elems.rbegin(), PE = Elems.rend(); PI != PE; ++PI) {
 
                  // offset with variable has no meaning
                  if (PI->second == -1)
@@ -707,10 +707,19 @@ bool PointsToGraph::applyRule(const llvm::DataLayout &DL,
 
                 int64_t sum = PI->second + off;
 
+                if (isArray) {
+                    if (sum < 0)
+                        sum = 0;
+                    /* unsoundnes :-) */
+                    else if (sum > 64)
+                        sum = 64;
+                }
+
                 if (!checkOffset(DL, val, sum))
                     continue;
 
                 changed |= insert(L, Ptr(val, sum));
+                break; // we're done!
             }
         }
     }
