@@ -953,19 +953,12 @@ static PointsToSets &pruneByType(PointsToSets &S) {
 
 const PointsToGraph& PointsToGraph::fixpoint(void)
 {
-  bool change;
+    DataLayout DL(&PS->getModule());
 
-  DataLayout DL(&PS->getModule());
+    for (ProgramStructure::const_iterator I = PS->begin(); I != PS->end(); ++I)
+        applyRules(*I, DL);
 
-  do {
-    change = false;
-
-    for (ProgramStructure::const_iterator I = PS->begin(); I != PS->end(); ++I) {
-      change |= applyRules(*I, DL);
-    }
-  } while (change);
-
-  return *this;
+    return *this;
 }
 
 PointsToSets &computePointsToSets(const ProgramStructure &P, PointsToSets &S,
