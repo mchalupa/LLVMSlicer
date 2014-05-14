@@ -203,6 +203,13 @@ void CallMaps::buildCallMaps(const Module &M) {
 namespace llvm {
 namespace ptr {
 
+
+// This is an implementation of Shapiro-Horwitz analysis
+//
+// See details at:
+// https://is.muni.cz/auth/th/396236/fi_b/?fakulta=1433;obdobi=5984;studium=576656;lang=cs;sorter=tema;balik=1275
+// http://www.eecs.umich.edu/acal/swerve/docs/54-1.pdf
+///
 PointsToGraph::~PointsToGraph()
 {
     std::unordered_map<Pointer, Node *>::iterator I, E;
@@ -236,8 +243,6 @@ static void printPtrName(const PointsToGraph::Pointee p)
 		errs() << "@";
     else
 		errs() << "%";
-
-
 
     if (val->hasName())
 	    errs() << val->getName().data();
@@ -298,23 +303,9 @@ void PointsToGraph::replaceNode(PointsToGraph::Node *a,
 
     Node::ElementsTy& Elements = a->getElements();
 
-    // we must zero out all occurences in the map
     for (Node::ElementsTy::iterator I = Elements.begin(), E = Elements.end();
          I != E; ++I) {
         Node *&n = Nodes[*I];
-        /*
-        if (n != a) {
-            errs() << "Pointer ";
-            printPtrName(*I);
-            errs() << " has set wrong node. Should be ";
-            a->dump();
-            errs() << "but is ";
-            if (n)
-                n->dump();
-            else
-                errs() << "NULL\n";
-        }
-        */
         n = b;
     }
 }
@@ -379,7 +370,6 @@ void PointsToGraph::replaceEdges(Node *a, Node *b)
             a->addNeighbour(Edges[I]);
         }
 }
-
 
 void PointsToGraph::mergeNodes(Node *a, Node *b)
 {
@@ -476,10 +466,10 @@ bool PointsToGraph::insertDerefPointee(Pointer p, Pointee location)
     LocationNode = findNode(location);
 
     if (!LocationNode) {
-        // if location do not have a node yet, then it do not have
+        // If location do not have a node yet, then it do not have
         // neighbours which should be inserted.
-        // Do NOT add p->location into graph, because this functions
-        // should add p->*location, which is something different.
+        // XXX maybe we should write out a message about unsoundness,
+        // since we're dereferencing pointer pointing to unknown location
         return false;
     }
 
@@ -813,8 +803,9 @@ bool PointsToGraph::applyRule(ASSIGNMENT<
     if (!r)
         return false;
 
-    // copy current edges, because we can change these edges, but
-    // we want to work only with these edges
+    // create a copy of current edges and iterate over this copy,
+    // because this operation can change the edges,
+    // but we need to iterate only over these (old) edges
     // XXX don't we need copying even when dereferencing only one side??
     Node *Edges[NODE_EDGES_NUM];
     memcpy(&Edges, r->getEdges(), sizeof Edges);

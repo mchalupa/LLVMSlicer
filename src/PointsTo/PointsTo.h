@@ -110,6 +110,9 @@ struct hash<Ptr> {
 namespace llvm {
 namespace ptr {
 
+    ///
+    // This class represents catagories in Shapiro-Horwitz points-to analysis
+    ///
     class PointsToCategories
     {
     public:
@@ -139,6 +142,15 @@ namespace ptr {
         unsigned int K;
     };
 
+    ///
+    // This class represents Storage Shape Graph as described
+    // in Shapiro-Horwitz analysis [1].
+    // See details at:
+    // https://is.muni.cz/auth/th/396236/fi_b/?fakulta=1433;obdobi=5984;studium=576656;lang=cs;sorter=tema;balik=1275
+    //
+    // [1] Marc Shapiro and Susan Horwitz: Fast and Accurate Flow-Insensitive Points-to Analysis
+    //     http://www.eecs.umich.edu/acal/swerve/docs/54-1.pdf
+    ///
     class PointsToGraph
     {
     public:
@@ -195,6 +207,8 @@ namespace ptr {
             unsigned int getCategory() const
                 { return Category; }
 
+            // Add edge from this node to node n.
+            // Merge nodes with same category if necessary.
             bool addNeighbour(Node *n)
             {
 
@@ -242,33 +256,32 @@ namespace ptr {
             void dump(void) const;
 
         private:
-            ElementsTy Elements; // items in node
-            ReferencesTy References; // what nodes points to this one?
+            ElementsTy Elements;      // items in node
+            ReferencesTy References;  // what nodes points to this one?
             Node *Edges[NODE_EDGES_NUM] = {0};
-            unsigned int EdgesNo = 0;
+            unsigned int EdgesNo = 0; // number of outgoing edges
 
             Pointee origin;
             PointsToGraph *PTG;
             unsigned int Category;
         };
 
-        const PointsToCategories *getCategories(void) const
-        {
-            return PTC;
-        }
+        const PointsToCategories *getCategories(void) const {  return PTC; }
 
         // insert that p points to location
         bool insert(Pointer p, Pointee location);
-       // insert that p points to all Pointees from locations
+        // insert that p points to all Pointees from locations
         bool insert(Pointer p, std::set<Pointee>& locations);
         // insert all pairs a->b where b is every pointer
         // the Pointee can points to
         bool insertDerefPointee(Pointer p, Pointee location);
-        bool insertDerefPointer(Pointer p, Pointee location);
         bool insertDerefPointee(Pointer p, Node *LocationNode);
         bool insertDerefPointee(Node *PointerNode, Node *LocationNode);
+        // insert all pairs a->b where a is every pointer the p can point to
+        bool insertDerefPointer(Pointer p, Pointee location);
         bool insertDerefPointer(Node *PointerNode, Pointee location);
         bool insertDerefPointer(Node *PointerNode, Node *LocationNode);
+
         bool insertDerefBoth(Node *PointerNode, Node *LocationNode);
 
         // add new node
@@ -281,6 +294,8 @@ namespace ptr {
 
         // replace node in map
         void replaceNode(Node *, Node *);
+        // make all nodes that points to the first node,
+        // point to the second node instead
         void replaceEdges(Node *, Node *);
 
         void mergeNodes(Node *, Node *);

@@ -141,6 +141,7 @@ class FixedCategories : public PointsToCategories
 public:
     FixedCategories(const std::set<std::set<Pointer> >& Categories)
     {
+	// it's not efficent, but it doesn't have to
         this->Categories = Categories;
     }
 
@@ -149,6 +150,7 @@ private:
     std::set<std::set<Pointer> > Categories;
 };
 
+// Simulates Andersen's algorithm
 class AllInSelfCategory : public PointsToCategories
 {
 public:

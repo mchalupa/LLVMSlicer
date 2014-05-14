@@ -214,7 +214,5 @@ unsigned int AllInSelfCategory::getCategory(PointsToGraph::Pointer a) const
     return num;
 }
 
-
-
 } // namespace ptr
 } // namespace llvm
