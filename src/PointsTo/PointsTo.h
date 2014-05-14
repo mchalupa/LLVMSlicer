@@ -148,7 +148,7 @@ namespace ptr {
         {
             // estimate number of pointers
             Nodes.reserve(3 * PS->getContainer().size() / 2);
-            fixpoint();
+            build();
         }
 
         virtual ~PointsToGraph();
@@ -330,7 +330,7 @@ namespace ptr {
         bool applyRules(const RuleCode &RC, const llvm::DataLayout &DL);
 
         // apply rules until you can
-        const PointsToGraph& fixpoint(void);
+        const PointsToGraph& build(void);
 
         // tester class, must be able to access private attributes
         friend class PTGTester;

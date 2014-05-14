@@ -951,7 +951,7 @@ static PointsToSets &pruneByType(PointsToSets &S) {
   return S;
 }
 
-const PointsToGraph& PointsToGraph::fixpoint(void)
+const PointsToGraph& PointsToGraph::build(void)
 {
     DataLayout DL(&PS->getModule());
 
