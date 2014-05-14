@@ -133,7 +133,7 @@ namespace ptr {
         IDBitsCategory(unsigned int K) { this->K = K; }
 
         virtual unsigned int getCategory(Pointer a) const
-            { return (((a.first->getValueID() ^ a.second) >> K) & 0x1); }
+            { return (((a.first->getValueID() ^ a.second) >> K) & 0x7); }
     private:
         // use Kth bit of ID
         unsigned int K;
