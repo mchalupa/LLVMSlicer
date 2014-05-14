@@ -23,39 +23,6 @@ static void add(long long unsigned int& sum, long unsigned cur, int N)
     }
 }
 
-static long long unsigned pointsToPerf(Module &M, int N, unsigned K)
-{
-    ptr::ProgramStructure P(M);
-    clock_t start, end, diff;
-    long long unsigned int sum = 0;
-    long unsigned cur = 0;
-
-    for (int I = 0; I < N; ++I) {
-        PointsToSets PS;
-
-        // take measurement
-        start = clock();
-        computePointsToSets(P, PS, K);
-        end = clock();
-
-        diff = end - start;
-
-        // (a1 + a2 + ... + an)    a1     a2           an
-        // -------------------- = ---- + ---- + ... + ----
-        //          n               n      n            n
-        if ((1LL * cur) + diff >= LONG_MAX) {
-            add(sum, cur, N);
-            cur = 0;
-        } else {
-            cur += diff;
-        }
-    }
-
-    // add last accumulation
-    add(sum, cur, N);
-    return sum;
-}
-
 static long int countPairs(const PointsToSets& PS)
 {
     long int pairs = 0;
@@ -68,13 +35,53 @@ static long int countPairs(const PointsToSets& PS)
     return pairs;
 }
 
+static long long unsigned pointsToPerf(Module &M, int N, unsigned K)
+{
+    ptr::ProgramStructure P(M);
+    long long unsigned int sum = 0;
+    long unsigned cur = 0;
+
+    struct timespec s, e;
+
+    for (int I = 0; I < N; ++I) {
+        PointsToSets PS;
+
+        // take measurement
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &s);
+        computePointsToSets(P, PS, K);
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &e);
+
+	long unsigned sn = 1000000000 * s.tv_sec + s.tv_nsec;
+	long unsigned en = 1000000000 * e.tv_sec + e.tv_nsec;
+
+	long unsigned diff = en - sn;
+
+        // (a1 + a2 + ... + an)    a1     a2           an
+        // -------------------- = ---- + ---- + ... + ----
+        //          n               n      n            n
+        if ((1LL * cur) + diff >= LONG_MAX) {
+            add(sum, cur, N);
+            cur = 0;
+        } else {
+            cur += diff;
+        }
+
+        if (I == N - 1)
+            errs() << "Pairs num: " << countPairs(PS) << "\n";
+    }
+
+    // add last accumulation
+    add(sum, cur, N);
+    return sum;
+}
+
 int main(int argc, char **argv)
 {
     LLVMContext context;
     SMDiagnostic SMD;
     Module *M;
     long long int Measurement;
-    int N = 1000, K = 0;
+    int N = 0, K = 1;
 
     if (argc == 1) {
         errs() << "Usage: program input.bc [-n runs_no] [-k K]\n";
@@ -105,18 +112,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (!N)
+	N = 1000 / K;
+
     // compute performance
     Measurement = pointsToPerf(*M, N, K);
-    errs() << (double) Measurement / CLOCKS_PER_SEC;
-
-    // compute number of points-to pairs
-    PointsToSets PS;
-    {
-        ptr::ProgramStructure P(*M);
-        computePointsToSets(P, PS, K);
-    }
-
-    errs() << " " << countPairs(PS) << "\n";
+    double sec = (double) Measurement / 1000000000;
+    errs() << "Sec: " << sec << "\n";
+    errs() << "MSec: " << sec * 1000 << "\n";
 
     delete M;
 
