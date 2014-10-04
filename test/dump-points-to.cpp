@@ -13,8 +13,8 @@ typedef ptr::PointsToSets::PointsToSet PTSet;
 static void pointsTo(const PTSet &P)
 {
 	for (PTSet::const_iterator I = P.begin(), E = P.end(); I != E; ++I) {
-		errs() << "\t OFF=" << I->second << " of";
-		I->first->dump();
+		errs() << "\t OFF=" << I->offset << " of";
+		I->location->dump();
 	}
 }
 
@@ -52,17 +52,17 @@ static void pointsTo(Module &M)
 		}
 		for (ptr::PointsToSets::const_iterator II = PS.begin(),
 				EE = PS.end(); II != EE; ++II) {
-			const ptr::PointsToSets::Pointer &Ptr = II->first;
+			const ptr::Pointer &Ptr = II->first;
 			const PTSet &P = II->second;
 
-			if (Ptr.second == -1)
+			if (Ptr.offset == -1)
 				continue;
 			if (const Instruction *ins =
-					dyn_cast<Instruction>(Ptr.first)) {
+					dyn_cast<Instruction>(Ptr.location)) {
 				if (ins->getParent()->getParent() != &F)
 					continue;
-				errs() << "PTSTO w/ OFF=" << Ptr.second;
-				Ptr.first->dump();
+				errs() << "PTSTO w/ OFF=" << Ptr.offset;
+				Ptr.location->dump();
 				pointsTo(P);
 			}
 		}
