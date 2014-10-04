@@ -18,6 +18,120 @@
 namespace llvm {
 namespace ptr {
 
+void PtrRange::print(void) const
+{
+  errs() << "[" << from << ", " << to << "]";
+}
+
+void PtrRange::operator+(const PtrRange& r)
+{
+  from += r.from;
+  to += r.to;
+
+  /* if any value vas undefined, now it is undefined */
+  flags |= r.flags;
+}
+
+void PtrRange::operator*(const PtrRange& r)
+{
+  PtrRange::Type tmp, tmp2, a, b;
+
+  if (abs(from) > abs(to)) {
+    a = to;
+    if (abs(r.from) > abs(r.to)) {
+      tmp = from * r.from;
+      b = r.to;
+    } else {
+      tmp = from * r.to;
+      b = r.from;
+    }
+  } else {
+    a = from;
+    if (abs(r.from) > abs(r.to)) {
+      tmp = to * r.from;
+      b = r.to;
+    } else {
+      tmp = to * r.to;
+      b = r.from;
+    }
+  }
+
+  tmp2 = a * b;
+
+  if (tmp < tmp2) {
+      from = tmp;
+      to = tmp2;
+  } else {
+      from = tmp2;
+      to = tmp;
+  }
+
+  flags |= r.flags;
+}
+
+void PtrRange::operator-(const PtrRange& r)
+{
+  if (r.isToUndefined())
+    fromUndefined();
+  else
+    from -= r.to;
+
+  if (r.isFromUndefined())
+    toUndefined();
+  else
+    to -= r.from;
+}
+
+void PtrRange::operator/(const PtrRange& r)
+{
+  if (r.isToUndefined())
+    fromUndefined();
+  else {
+    assert(r.to != 0 && "Division by 0");
+    from /= r.to;
+  }
+
+  if (r.isFromUndefined())
+    toUndefined();
+  else {
+    assert(r.from != 0 && "Division by 0");
+    to /= r.from;
+  }
+
+  // negative values
+  if (to < from)
+      swapValues();
+}
+
+void PtrRange::operator+(const Type val)
+{
+    /* if it's undefined, it'll stay undefinded */
+    from += val;
+    to += val;
+} 
+
+void PtrRange::operator/(const Type val)
+{
+  assert(val != 0 && "Division by 0");
+  from /= val;
+  to /= val;
+
+  if (to < from)
+      swapValues();
+}
+
+void PtrRange::operator-(const Type val)
+{
+  from -= val;
+  to -= val;
+}
+
+void PtrRange::operator*(const Type val)
+{
+  from *= val;
+  to *= val;
+}
+
 bool Pointer::operator<(const Pointer& ptr) const
 {
   if (location == ptr.location)
@@ -28,8 +142,6 @@ bool Pointer::operator<(const Pointer& ptr) const
 
 } // llvm
 } // ptr
-
-
 
 namespace llvm { namespace ptr { namespace detail {
 

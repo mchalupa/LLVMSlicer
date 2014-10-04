@@ -14,6 +14,66 @@
 
 namespace llvm {
 namespace ptr {
+
+  /* the most significant bit is not used and is used
+   * as a marker for undefined */
+  enum {
+    RANGE_TO_UNDEF    = 1,
+    RANGE_FROM_UNDEF  = 1 << 1,
+  };
+
+  /* we could do it as a template, it would be nice but useless... */
+  struct PtrRange {
+    typedef int32_t Type;
+
+    Type from;
+    Type to;
+
+    /*  we could use different special values of from and to and
+     *  do masking and bit shifting.. but today when the memory
+     *  is so cheap... */
+    uint8_t flags;
+
+    PtrRange() :flags(RANGE_TO_UNDEF | RANGE_FROM_UNDEF) {};
+    PtrRange(const Type v) : from(v), to(v), flags(0) {};
+    PtrRange(const Type f, const Type t)
+      :from(f), to(t), flags(0) {}
+
+    bool isFromUndefined(void) const { return flags & RANGE_FROM_UNDEF; }
+    bool isToUndefined(void) const { return flags & RANGE_TO_UNDEF; }
+    bool isUndefined(void) const { return isToUndefined() && isFromUndefined();}
+
+    void operator=(const PtrRange& r)
+      { from = r.from; to = r.to; flags = r.flags; }
+    void operator=(const Type val) { setTo(val);  setFrom(val); }
+    bool operator==(const PtrRange& r) const
+      { return from == r.from && to == r.to && flags == r.flags; }
+    bool operator!=(const PtrRange& r) const { return !operator==(r); }
+
+    void operator+(const Type val);
+    void operator-(const Type val);
+    void operator*(const Type val);
+    void operator/(const Type val);
+
+    void operator+(const PtrRange& r);
+    void operator-(const PtrRange& r);
+    void operator*(const PtrRange& r);
+    void operator/(const PtrRange& r);
+
+    void setFrom(const Type v) { fromDefined(); from = v; }
+    void setTo(const Type v) { toDefined(); to = v; }
+
+    void print(void) const;
+
+  private:
+    void fromDefined(void) { flags &= (~RANGE_FROM_UNDEF); }
+    void toDefined(void) { flags &= (~RANGE_TO_UNDEF); }
+    void fromUndefined(void) { flags &= RANGE_FROM_UNDEF; }
+    void toUndefined(void) { flags &= RANGE_TO_UNDEF; }
+
+    void swapValues(void) { Type tmp = from; from = to; to = tmp; }
+  };
+
   /*
    * pointer is a pair <location, offset> such that the location is:
    * a) variable, offset is -1
