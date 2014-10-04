@@ -53,8 +53,8 @@ namespace llvm { namespace mods {
 	  const PTSet &S = ptr::getPointsToSet(c->getVar(), PS);
 
 	  for (PTSet::const_iterator p = S.begin(); p != S.end(); ++p)
-	    if (!isLocalToFunction(p->first, f->first) &&
-			    !isConstantValue(p->first))
+	    if (!isLocalToFunction(p->location, f->first) &&
+			    !isConstantValue(p->location))
 	      MOD[f->first].insert(*p);
 	}
 
@@ -75,7 +75,7 @@ namespace llvm { namespace mods {
 		dst.end());
 #endif
       for (dst_t::iterator I = dst.begin(), E = dst.end(); I != E; ) {
-	if (isLocalToFunction(I->first, i->first))
+	if (isLocalToFunction(I->location, i->first))
 	  dst.erase(I++);
 	else
 	  ++I;
