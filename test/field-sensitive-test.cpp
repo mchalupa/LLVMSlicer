@@ -13,8 +13,8 @@
 
 using namespace llvm;
 
-typedef ptr::PointsToSets::Pointer Ptr;
-typedef ptr::PointsToSets::Pointee Ptee;
+typedef ptr::Pointer Ptr;
+typedef Ptr Ptee;
 typedef ptr::PointsToSets::PointsToSet PTSet;
 typedef std::pair<const Ptr, const Ptee> ToCheckEl;
 typedef SmallVector<ToCheckEl, 20> ToCheck;
@@ -30,14 +30,14 @@ static void pointsTo(Module &M, const ToCheck &toCheck)
 	for (ptr::PointsToSets::const_iterator I = PS.begin(), E = PS.end();
 			I != E; ++I) {
 		const Ptr &ptr = I->first;
-		errs() << "OFF=" << ptr.second;
-		ptr.first->dump();
+		errs() << "OFF=" << ptr.offset;
+		ptr.location->dump();
 		const PTSet &p = I->second;
 		for (PTSet::const_iterator II = p.begin(), EE = p.end();
 				II != EE; ++II) {
 			const Ptee &ptee = *II;
-			errs() << "\tOFF=" << ptee.second;
-			ptee.first->dump();
+			errs() << "\tOFF=" << ptee.offset;
+			ptee.location->dump();
 		}
 	}
 
@@ -48,12 +48,12 @@ static void pointsTo(Module &M, const ToCheck &toCheck)
 		const Ptr &ptr = I->first;
 		const Ptee &ptee1 = I->second;
 #ifdef DEBUG
-		errs() << "Checking if OFF=" << ptr.second;
-		ptr.first->dump();
-		errs() << "\tpoints to: OFF=" << ptee1.second;
-		ptee1.first->dump();
+		errs() << "Checking if OFF=" << ptr.offset;
+		ptr.location->dump();
+		errs() << "\tpoints to: OFF=" << ptee1.offset;
+		ptee1.location->dump();
 #endif
-		const PTSet &S = ptr::getPointsToSet(ptr.first, PS, ptr.second);
+		const PTSet &S = ptr::getPointsToSet(ptr.location, PS, ptr.offset);
 		bool found = false;
 		for (PTSet::const_iterator II = S.begin(), EE = S.end();
 				II != EE; ++II) {
@@ -65,10 +65,10 @@ static void pointsTo(Module &M, const ToCheck &toCheck)
 		}
 		if (!found) {
 			errs() << "Cannot find pointee for OFF=" <<
-				ptr.second;
-			ptr.first->dump();
-			errs() << "\tshould point to OFF=" << ptee1.second;
-			ptee1.first->dump();
+				ptr.offset;
+			ptr.location->dump();
+			errs() << "\tshould point to OFF=" << ptee1.offset;
+			ptee1.location->dump();
 			abort();
 		}
 	}
