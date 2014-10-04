@@ -103,7 +103,7 @@ public:
 			   const Pointee &cond = Pointee(0, 0),
 			   bool deslice = true) {
     InsInfo *ii = getInsInfo(ins);
-    if (cond.first)
+    if (cond.location)
       ii->addRC(cond);
     ii->deslice();
   }

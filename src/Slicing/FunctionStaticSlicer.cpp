@@ -60,7 +60,7 @@ void InsInfo::addDEFArray(const ptr::PointsToSets &PS, const Value *V,
     const PTSet &L = getPointsToSet(V, PS);
     for (PTSet::const_iterator p = L.begin(); p != L.end(); ++p)
       for (uint64_t i = 0; i < lenConst; i++)
-	addDEF(Pointee(p->first, p->second + i));
+	addDEF(Pointee(p->location, p->offset + i));
   }
 }
 
@@ -91,7 +91,7 @@ void InsInfo::addREFArray(const ptr::PointsToSets &PS, const Value *V,
     const PTSet &R = getPointsToSet(V, PS);
     for (PTSet::const_iterator p = R.begin(); p != R.end(); ++p)
       for (uint64_t i = 0; i < lenConst; i++)
-	addREF(Pointee(p->first, p->second + i));
+	addREF(Pointee(p->location, p->offset + i));
   }
 }
 
@@ -309,11 +309,6 @@ static SuccList getSuccList(const Instruction *i) {
   return succList;
 }
 
-bool FunctionStaticSlicer::sameValues(const Pointee &val1, const Pointee &val2)
-{
-  return val1.first == val2.first && val1.second == val2.second;
-}
-
 /*
  * RC(i)=RC(i) \cup
  *   {v| v \in RC(j), v \notin DEF(i)} \cup
@@ -329,7 +324,7 @@ bool FunctionStaticSlicer::computeRCi(InsInfo *insInfoi, InsInfo *insInfoj) {
     bool in_DEF = false;
     for (ValSet::const_iterator II = insInfoi->DEF_begin(),
          EE = insInfoi->DEF_end(); II != EE; II++)
-      if (sameValues(*II, RCj)) {
+      if (*II == RCj) {
         in_DEF = true;
         break;
       }
@@ -344,7 +339,7 @@ bool FunctionStaticSlicer::computeRCi(InsInfo *insInfoi, InsInfo *insInfoj) {
     const Pointee &DEFi = *I;
     for (ValSet::const_iterator II = insInfoj->RC_begin(),
          EE = insInfoj->RC_end(); II != EE; II++) {
-      if (sameValues(DEFi, *II)) {
+      if (DEFi == *II) {
         isect_nonempty = true;
         break;
       }
@@ -424,7 +419,7 @@ void FunctionStaticSlicer::computeSCi(const Instruction *i, const Instruction *j
     const Pointee &DEFi = *I;
     for (ValSet::const_iterator II = insInfoj->RC_begin(),
          EE = insInfoj->RC_end(); II != EE; II++) {
-      if (sameValues(DEFi, *II)) {
+      if (DEFi == *II) {
         isect_nonempty = true;
         break;
       }
@@ -538,20 +533,20 @@ void FunctionStaticSlicer::dump() {
     errs() << "SLICED\n    DEF:\n";
     for (ValSet::const_iterator II = ii->DEF_begin(), EE = ii->DEF_end();
          II != EE; II++) {
-      errs() << "      OFF=" << II->second << " ";
-      II->first->dump();
+      errs() << "      OFF=" << II->offset << " ";
+      II->location->dump();
     }
     errs() << "    REF:\n";
     for (ValSet::const_iterator II = ii->REF_begin(), EE = ii->REF_end();
          II != EE; II++) {
-      errs() << "      OFF=" << II->second << " ";
-      II->first->dump();
+      errs() << "      OFF=" << II->offset << " ";
+      II->location->dump();
     }
     errs() << "    RC:\n";
     for (ValSet::const_iterator II = ii->RC_begin(), EE = ii->RC_end();
          II != EE; II++) {
-      errs() << "      OFF=" << II->second << " ";
-      II->first->dump();
+      errs() << "      OFF=" << II->offset << " ";
+      II->location->dump();
     }
   }
 #endif
