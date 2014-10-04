@@ -46,7 +46,7 @@ namespace llvm { namespace slicing { namespace detail {
 	    ParamsToArgs::const_iterator it = toArgs.find(*b);
 	    if (it != toArgs.end())
 		out.insert(it->second);
-	    else if (!isLocalToFunction(b->first, F))
+	    else if (!isLocalToFunction(b->location, F))
 		out.insert(*b);
 	}
     }
@@ -63,7 +63,7 @@ namespace llvm { namespace slicing { namespace detail {
 	}
 
 	for ( ; b != e; ++b)
-	    if (b->first == C) {
+	    if (b->location == C) {
 		Value *ret = R->getReturnValue();
 		if (!ret) {
 /*		    C->dump();
