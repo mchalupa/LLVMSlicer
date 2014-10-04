@@ -29,6 +29,11 @@ namespace ptr {
     int32_t offset;
 
     bool operator<(const Pointer& ptr) const;
+    bool operator==(const Pointer& ptr) const
+      { return location == ptr.location && offset == ptr.offset; }
+
+    Pointer(MemoryLocation loc, int32_t off)
+      : location(loc), offset(off) {}
   };
 } // llvm
 } // ptr
