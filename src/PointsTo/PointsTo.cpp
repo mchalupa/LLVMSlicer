@@ -15,6 +15,22 @@
 
 #include "../Languages/LLVM.h"
 
+namespace llvm {
+namespace ptr {
+
+bool Pointer::operator<(const Pointer& ptr) const
+{
+  if (location == ptr.location)
+      return offset < ptr.offset;
+
+  return location < ptr.location;
+}
+
+} // llvm
+} // ptr
+
+
+
 namespace llvm { namespace ptr { namespace detail {
 
 class CallMaps {

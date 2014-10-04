@@ -12,26 +12,37 @@
 
 #include "RuleExpressions.h"
 
+namespace llvm {
+namespace ptr {
+  /*
+   * pointer is a pair <location, offset> such that the location is:
+   * a) variable, offset is -1
+   * b) alloc,    offset is <0,infty) -- structure members can point too
+   *
+   * Note that in LLVM, both a variable and an alloc (CallInst to malloc)
+   * are llvm::Value.
+   */
+  struct Pointer {
+    typedef const llvm::Value *MemoryLocation;
+
+    MemoryLocation location;
+    int32_t offset;
+
+    bool operator<(const Pointer& ptr) const;
+  };
+} // llvm
+} // ptr
+
 namespace llvm { namespace ptr {
 
   class PointsToSets {
   public:
-    typedef const llvm::Value *MemoryLocation;
     /*
-     * pointer is a pair <location, offset> such that the location is:
-     * a) variable, offset is -1
-     * b) alloc,    offset is <0,infty) -- structure members can point too
-     *
-     * Note that in LLVM, both a variable and an alloc (CallInst to malloc)
-     * are llvm::Value.
-     */
-    typedef std::pair<MemoryLocation, int> Pointer;
-    /*
-     * Points-to set contains against pairs <location, offset>, where location
+     * Points-to set contains again pairs <location, offset>, where location
      * can be only an alloc companied by an offset (we can point to the
      * middle).
      */
-    typedef std::pair<MemoryLocation, int> Pointee;
+    typedef Pointer Pointee;
     typedef std::set<Pointee> PointsToSet;
 
     typedef std::map<Pointer, PointsToSet> Container;
