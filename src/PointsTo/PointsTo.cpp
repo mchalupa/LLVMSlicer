@@ -218,7 +218,7 @@ void CallMaps::buildCallMaps(const Module &M) {
 namespace llvm { namespace ptr {
 
 typedef PointsToSets::PointsToSet PTSet;
-typedef PointsToSets::Pointer Ptr;
+typedef Pointer Ptr;
 
 static bool applyRule(PointsToSets &S, ASSIGNMENT<
 		    VARIABLE<const llvm::Value *>,
@@ -301,18 +301,18 @@ static bool applyRule(PointsToSets &S, const llvm::DataLayout &DL, ASSIGNMENT<
     } else {
 	const PTSet &R = S[Ptr(op, -1)];
 	for (PTSet::const_iterator I = R.begin(), E = R.end(); I != E; ++I) {
-	    assert(I->second >= 0);
+	    assert(I->offset >= 0);
 
 	    /* disable recursive structures */
 	    if (L.count(*I))
 		    continue;
 
-	    const Value *Rval = I->first;
+	    const Value *Rval = I->location;
 
 	    if (off && (isa<Function>(Rval) || isa<ConstantPointerNull>(Rval)))
 	      continue;
 
-	    int64_t sum = I->second + off;
+	    int64_t sum = I->offset + off;
 
 	    if (!checkOffset(DL, Rval, sum))
 	      continue;
@@ -320,7 +320,7 @@ static bool applyRule(PointsToSets &S, const llvm::DataLayout &DL, ASSIGNMENT<
 	    unsigned int sameCount = 0;
 	    for (PTSet::const_iterator II = L.begin(), EE = L.end();
 		II != EE; ++II) {
-	      if (II->first == Rval)
+	      if (II->location == Rval)
 		if (++sameCount >= 5)
 		  break;
 	    }
@@ -329,17 +329,17 @@ static bool applyRule(PointsToSets &S, const llvm::DataLayout &DL, ASSIGNMENT<
 #ifdef DEBUG_CROPPING
 	      errs() << "dropping GEP ";
 	      gep->dump();
-	      errs() << "\tHAVE " << off << "+" << " OFF=" << I->second << " ";
+	      errs() << "\tHAVE " << off << "+" << " OFF=" << I->offset << " ";
 	      Rval->dump();
 #endif
 	      continue;
 	    }
 
 	    if (sum < 0) {
-		    assert(I->second >= 0);
+		    assert(I->offset >= 0);
 #ifdef DEBUG_CROPPING
 		    errs() << "variable index, cropping to 0: " <<
-			    I->second << "+" << off << "\n\t";
+			    I->offset << "+" << off << "\n\t";
 		    gep->dump();
 		    errs() << "\tPTR=";
 		    Rval->dump();
@@ -445,8 +445,8 @@ static bool applyRule(PointsToSets &S, ASSIGNMENT<
     bool change = false;
 
     for (PTSet::const_iterator i = L.begin(); i != L.end(); ++i)
-	if (applyRule(S, (ruleVar(i->first) = *ruleVar(rval)).getSort(),
-				i->second))
+	if (applyRule(S, (ruleVar(i->location) = *ruleVar(rval)).getSort(),
+				i->offset))
 	    change = true;
 
     return change;
@@ -549,7 +549,7 @@ static bool applyRules(const RuleCode &RC, PointsToSets &S,
 static PointsToSets &pruneByType(PointsToSets &S) {
   typedef PointsToSets::mapped_type PTSet;
   for (PointsToSets::iterator s = S.begin(); s != S.end(); ) {
-      const llvm::Value *first = s->first.first;
+      const llvm::Value *first = s->first.location;
       if (llvm::isa<llvm::Function>(first)) {
 	const PointsToSets::iterator tmp = s++;
 	S.getContainer().erase(tmp);
