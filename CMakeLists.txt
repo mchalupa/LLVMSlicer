@@ -27,3 +27,10 @@ enable_testing()
 
 add_subdirectory(src)
 add_subdirectory(test)
+
+add_custom_target(
+	slicerversion ALL sh slicer_version.sh
+)
+
+install(FILES LLVM_SLICER_VERSION
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/)
